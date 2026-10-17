@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "My Plan - Daily Planner",
+  "version": "0.1.0",
+  "description": "파스텔 블루 데일리 플래너",
+  "action": {
+    "default_title": "My Plan",
+    "default_popup": "index.html"
+  },
+  "permissions": ["storage"]
+}
