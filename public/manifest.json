@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "My Plan - Daily Planner",
   "version": "0.1.0",
-  "description": "파스텔 블루 데일리 플래너",
+  "description": "파스텔 블루 데일리 플래너 (Google Calendar & Tasks 연동 지원)",
   "icons": {
     "16": "MyPlan_icon.png",
     "32": "MyPlan_icon.png",
@@ -19,5 +19,18 @@
       "128": "MyPlan_icon.png"
     }
   },
-  "permissions": ["storage"]
+  "permissions": ["storage", "identity"],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://tasks.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/tasks"
+    ]
+  }
 }

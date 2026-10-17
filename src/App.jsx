@@ -8,8 +8,6 @@ import {
   ChevronRight,
   Plus,
   Clock3,
-  NotebookPen,
-  Pencil,
   Play,
   Pause,
   RotateCcw,
@@ -26,53 +24,335 @@ import {
   Trash2,
   Target,
   Flame,
+  Star,
+  HelpCircle,
+  Coffee,
+  Github,
+  RotateCw,
+  Database,
+  ShieldCheck,
+  Cloud,
+  LogOut,
+  KeyRound,
+  Copy,
+  Repeat,
 } from "lucide-react";
+import {
+  loginWithGoogle,
+  logoutGoogle,
+  fetchGoogleUserProfile,
+  fetchGoogleCalendarEvents,
+  createGoogleCalendarEvent,
+  updateGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+  fetchGoogleTasks,
+  createGoogleTask,
+  updateGoogleTaskStatus,
+  deleteGoogleTask,
+  getRedirectUri,
+  getActiveClientId,
+} from "./googleSync";
 
 /* ==========================================================================
-   [가이드 1] 오늘의 타임라인 & 주간 계획표 7가지 파스텔 색상 설정 (3번째 사진 반영)
-   - 타임라인 일정 색상을 추가/변경하려면 아래 SCHEDULE_COLORS 배열을 수정하세요.
+   [가이드 0] 외부 링크 및 프로젝트 메타 정보 설정
+   - GitHub 주소, 크롬 웹스토어 주소, 후원 링크 등을 이곳에서 손쉽게 변경하세요.
+   ========================================================================== */
+const APP_META = {
+  version: "0.1.0",
+  license: "MIT License",
+  githubUrl: "https://github.com/relaxman/my-plan-extension",
+  chromeStoreReviewUrl: "https://chromewebstore.google.com/",
+  buyMeACoffeeUrl: "https://www.buymeacoffee.com/",
+  kakaoPayNote: "카카오페이 / 토스 QR 후원 준비 중입니다.",
+};
+
+/* ==========================================================================
+   [가이드 1] 오늘의 타임라인 & 주간 계획표 7가지 파스텔 색상 설정
    ========================================================================== */
 const SCHEDULE_COLORS = [
-  { id: "rose", label: "핑크", hex: "#f4c7cc", bg: "#fdecef", border: "#f7d4da", text: "#8c3b47" },
-  { id: "peach", label: "피치", hex: "#f9dcc0", bg: "#fff3e6", border: "#fce0c5", text: "#945623" },
-  { id: "butter", label: "옐로우", hex: "#faefb8", bg: "#fffbe4", border: "#f7e8a4", text: "#856d1b" },
-  { id: "sage", label: "민트그린", hex: "#cfe8cf", bg: "#eef9ee", border: "#d4ecd4", text: "#2e6e36" },
-  { id: "sky", label: "스카이", hex: "#c7ddf7", bg: "#eaf3ff", border: "#cfe3fc", text: "#285999" },
-  { id: "periwinkle", label: "블루", hex: "#a4c6f5", bg: "#e0eeff", border: "#bad6fa", text: "#1e4c90" },
-  { id: "stone", label: "그레이", hex: "#e2e5ea", bg: "#f3f5f8", border: "#dfe4ec", text: "#4c5b70" },
+  { id: "rose", labelKo: "핑크", labelEn: "Rose", hex: "#f4c7cc", bg: "#fdecef", border: "#f7d4da", text: "#8c3b47" },
+  { id: "peach", labelKo: "피치", labelEn: "Peach", hex: "#f9dcc0", bg: "#fff3e6", border: "#fce0c5", text: "#945623" },
+  { id: "butter", labelKo: "옐로우", labelEn: "Butter", hex: "#faefb8", bg: "#fffbe4", border: "#f7e8a4", text: "#856d1b" },
+  { id: "sage", labelKo: "민트그린", labelEn: "Sage", hex: "#cfe8cf", bg: "#eef9ee", border: "#d4ecd4", text: "#2e6e36" },
+  { id: "sky", labelKo: "스카이", labelEn: "Sky", hex: "#c7ddf7", bg: "#eaf3ff", border: "#cfe3fc", text: "#285999" },
+  { id: "periwinkle", labelKo: "블루", labelEn: "Periwinkle", hex: "#a4c6f5", bg: "#e0eeff", border: "#bad6fa", text: "#1e4c90" },
+  { id: "stone", labelKo: "그레이", labelEn: "Stone", hex: "#e2e5ea", bg: "#f3f5f8", border: "#dfe4ec", text: "#4c5b70" },
 ];
 
 const COLOR_MAP = Object.fromEntries(SCHEDULE_COLORS.map((c) => [c.id, c]));
 
 /* ==========================================================================
-   [가이드 2] To-Do List 태그(카테고리) 설정
-   - 할 일 목록 및 분석 페이지의 '주요 활동 비율(태그 비율)'에 사용되는 태그입니다.
+   [가이드 2] To-Do List 태그(카테고리) 설정 (한국어/영어 UI 라벨 지원)
    ========================================================================== */
 const TAG_CONFIG = {
-  학습: { className: "tag-blue", hex: "#5a9cf8" },
-  운동: { className: "tag-mint", hex: "#4ecdc4" },
-  공부: { className: "tag-purple", hex: "#9b8afb" },
-  업무: { className: "tag-orange", hex: "#f7a35c" },
-  휴식: { className: "tag-pink", hex: "#f490b9" },
-  식사: { className: "tag-mint", hex: "#6dd3b3" },
-  기타: { className: "tag-gray", hex: "#8aa8cc" },
+  학습: { className: "tag-blue", hex: "#5a9cf8", ko: "학습", en: "Study" },
+  운동: { className: "tag-mint", hex: "#4ecdc4", ko: "운동", en: "Workout" },
+  공부: { className: "tag-purple", hex: "#9b8afb", ko: "공부", en: "Exam" },
+  업무: { className: "tag-orange", hex: "#f7a35c", ko: "업무", en: "Work" },
+  휴식: { className: "tag-pink", hex: "#f490b9", ko: "휴식", en: "Rest" },
+  식사: { className: "tag-mint", hex: "#6dd3b3", ko: "식사", en: "Meal" },
+  기타: { className: "tag-gray", hex: "#8aa8cc", ko: "기타", en: "Etc" },
 };
 
 const TAG_LIST = Object.keys(TAG_CONFIG);
 
 /* ==========================================================================
-   [가이드 3] 스탑워치 프리셋 설정 (2번째 사진 반영)
+   [가이드 3] 스탑워치 프리셋 설정 (한국어/영어 UI 라벨 지원)
    ========================================================================== */
 const PRESET_LIST = [
-  { m: 25, label: "25분", sub: "뽀모도로" },
-  { m: 50, label: "50분", sub: "긴 집중" },
-  { m: 60, label: "1시간", sub: "몰입" },
+  { m: 25, labelKo: "25분", subKo: "뽀모도로", labelEn: "25m", subEn: "Pomodoro" },
+  { m: 50, labelKo: "50분", subKo: "긴 집중", labelEn: "50m", subEn: "Deep Focus" },
+  { m: 60, labelKo: "1시간", subKo: "몰입", labelEn: "1h", subEn: "Immersion" },
 ];
 
 /* ==========================================================================
-   [가이드 4] 초기 샘플 데이터 (localStorage에 데이터가 없을 때만 사용됨)
+   [가이드 4] 다국어(한국어 / English) UI 텍스트 사전
+   - 사용자가 입력한 일정/할 일 데이터는 그대로 유지하고,
+     기본 UI 텍스트만 한국어 <-> English로 즉시 전환됩니다.
    ========================================================================== */
-const seedTasks = [
+const UI_TEXT = {
+  한국어: {
+    settings: "빠른 설정",
+    openAnalytics: "전체 분석 플랫폼 열기",
+    theme: "테마",
+    dark: "다크",
+    light: "라이트",
+    langLabel: "언어",
+    rateUs: "별점 남기기 (Rate Us)",
+    rateThanks: "소중한 별점 감사합니다! 스토어로 이동할까요?",
+    openStore: "스토어 리뷰 열기",
+    loadSample: "샘플 데이터 채우기",
+    clearAllData: "전체 데이터 초기화",
+    confirmClear: "모든 일정, 할 일, 집중 기록을 초기화할까요?",
+    dataSection: "데이터 관리",
+    coffeeBtn: "개발자에게 커피 사주기",
+    helpBtn: "정보 및 라이선스",
+    todayTimeline: "오늘의 타임라인",
+    emptyTimelineHint: "시간대에 마우스를 올려 + 버튼으로 일정을 추가해 보세요.",
+    eventNamePlaceholder: "일정 이름",
+    delete: "삭제",
+    cancel: "취소",
+    save: "저장",
+    completedCheck: "완료됨",
+    todoTitle: "할 일 목록",
+    todoSub: "작은 일부터 하나씩 완료해 보세요.",
+    todoPlaceholder: "할 일을 입력하세요...",
+    emptyTodoHint: "아직 등록된 할 일이 없습니다. 첫 할 일을 추가해 보세요!",
+    filterAll: "전체",
+    filterActive: "오늘",
+    filterDone: "완료",
+    focusSession: "FOCUS SESSION",
+    focusTitle: "집중하는 시간",
+    focusDesc: "지금 이 순간, 한 가지에 집중해 보세요.",
+    focusTimeLabel: "집중 시간",
+    remainingLabel: "남은 시간",
+    startBtn: "시작하기",
+    pauseBtn: "일시정지",
+    resetBtn: "초기화",
+    todayFocusLog: "오늘의 집중 기록",
+    emptyFocusTitle: "기록을 쌓아보세요",
+    emptyFocusDesc: "집중 세션이 완료되면 시작 시각과 함께 누적됩니다.",
+    minuteUnit: "분",
+    hourUnit: "시간",
+    // Analytics Platform
+    platformSub: "오늘도, 조금 더 나은 하루를 위해 · 통합 분석 리포트",
+    navAll: "전체 분석 플랫폼",
+    navWeekly: "주간 시간표 & 할 일",
+    navFocus: "스탑워치 집중 분석",
+    pastelLight: "파스텔 라이트",
+    darkReport: "다크 리포트",
+    backToPopup: "팝업으로 돌아가기",
+    kpiTotalFocus: "스탑워치 총 집중시간",
+    kpiWeekFocus: "이번 주 집중시간",
+    kpiTodayFocus: "오늘 집중시간",
+    kpiDoneTasks: "총 완료된 할 일",
+    kpiDoneBlocks: "주간 완료 일정",
+    kpiAchievement: "종합 달성률",
+    weeklyScheduleTitle: "주간 계획표 (클릭하여 색상별 일정 추가/수정)",
+    weeklyScheduleSub: "시간표의 칸을 클릭해 7가지 파스텔 색상으로 일정을 등록하거나 완료 체크하세요.",
+    timeCol: "시간",
+    weeklyStatsTitle: "주간 통계 · 성과율",
+    completionRateTitle: "계획 대비 완료율",
+    completionRateDesc: "주간 시간표 완료 블록(60%)과 할 일 달성률(40%)을 합산한 종합 성과 지표입니다.",
+    totalPlanned: "총 계획 시간",
+    actualProgress: "실제 진행 시간",
+    remainingTime: "미완료 시간",
+    tagRatioTitle: "주요 항목 비율 (할 일 태그 기준)",
+    totalTasksCount: (n) => `총 ${n}개 할 일`,
+    emptyTagRatio: "할 일을 추가하면 태그 비율이 표시됩니다.",
+    todoListCardTitle: "할 일 리스트",
+    newTaskPlaceholder: "새 할 일 입력...",
+    focusRecordTitle: "스탑워치 · 공부 집중시간 기록",
+    focusRecordSub: "최근 10일간 실제 시작한 시각 기준의 공부 집중 세션 분포입니다.",
+    addCurrentFocusBtn: "+ 현재 시각으로 집중 기록 추가",
+    dateCol: "날짜",
+    todayLabel: "오늘",
+    yesterdayLabel: "어제",
+    goalCardTitle: "목표 집중 시간 달성",
+    goalCardSub: (f, a, r) => `집중한 날: ${f}일 · 달성 일수: ${a}일 · 달성률: ${r}%`,
+    goalBadge: "목표:",
+    recentFocusLogTitle: "최근 스탑워치 집중 로그",
+    startedAt: "시작",
+    // Modals
+    infoModalTitle: "My Plan 정보 & 라이선스",
+    infoDesc: "일일 타임라인, 태그 기반 To-Do, 포모도로 집중 타이머 및 주간 분석을 제공하는 생산성 크롬 확장프로그램입니다.",
+    versionLabel: "버전",
+    licenseLabel: "라이선스",
+    openSourceLabel: "오픈소스 고지",
+    githubRepoBtn: "GitHub 저장소 방문하기",
+    coffeeModalTitle: "개발자에게 커피 한 잔 선물하기",
+    coffeeModalDesc: "My Plan이 하루를 계획하는 데 도움이 되셨나요? 따뜻한 커피 한 잔은 개발자가 꾸준히 기능을 업데이트하는 데 큰 힘이 됩니다!",
+    coffeeGlobalBtn: "Buy Me a Coffee로 후원하기",
+    coffeeLocalTitle: "국내 간편 후원 (카카오페이 / 토스)",
+    // Google Sync
+    googleSectionTitle: "Google 캘린더 · 할 일 연동",
+    googleLoginBtn: "Google 계정으로 연동하기",
+    googleSyncNow: "동기화",
+    googleSyncing: "동기화 중...",
+    googleLogout: "연동 해제",
+    googleClientIdBtn: "OAuth Client ID 설정",
+    googleModalTitle: "Google 인증 & 캘린더·할일 연동 설정",
+    googleModalDesc: "Google Cloud Console에서 발급한 OAuth Client ID를 입력하면 구글 캘린더(일정)와 Google Tasks(할 일)가 실시간 양방향 연동됩니다.",
+    redirectUriLabel: "1. 승인된 리디렉션 URI (복사해서 등록)",
+    clientIdLabel: "2. Google OAuth 클라이언트 ID",
+    clientIdPlaceholder: "xxxx...apps.googleusercontent.com",
+    saveAndConnectBtn: "저장 후 Google 로그인",
+    saveOnlyBtn: "Client ID만 저장",
+    lastSyncedLabel: "최근 동기화:",
+    copiedText: "복사됨!",
+    copyText: "복사",
+    // 평일 루틴 반복 기능
+    weekdayRepeatTitle: "평일 루틴 자동 반복 (월~금)",
+    weekdayRepeatDesc: "ON 시 주간 계획표나 오늘의 일정을 평일마다 자동으로 채워줍니다.",
+    weekdayRepeatCheck: "평일(월~금) 매일 반복 루틴으로 등록",
+    weekdayRepeatShort: "평일 반복",
+    saveAsWeekdayRoutine: "오늘 일정을 평일 루틴으로 저장",
+    routineSavedToast: "평일 루틴이 적용되었습니다!",
+  },
+  English: {
+    settings: "Quick Settings",
+    openAnalytics: "Open Full Analytics",
+    theme: "Theme",
+    dark: "Dark",
+    light: "Light",
+    langLabel: "Language",
+    rateUs: "Rate Us",
+    rateThanks: "Thank you for rating! Leave a review on the store?",
+    openStore: "Open Chrome Web Store",
+    loadSample: "Load Sample Data",
+    clearAllData: "Reset All Data",
+    confirmClear: "Reset all schedules, tasks, and focus logs to empty?",
+    dataSection: "Data Management",
+    coffeeBtn: "Buy Developer a Coffee",
+    helpBtn: "About & License",
+    todayTimeline: "Today's Timeline",
+    emptyTimelineHint: "Hover over any time slot and click + to add a schedule.",
+    eventNamePlaceholder: "Event title",
+    delete: "Delete",
+    cancel: "Cancel",
+    save: "Save",
+    completedCheck: "Completed",
+    todoTitle: "To-Do List",
+    todoSub: "Complete your tasks one step at a time.",
+    todoPlaceholder: "Add a new task...",
+    emptyTodoHint: "No tasks yet. Add your first task above!",
+    filterAll: "All",
+    filterActive: "Active",
+    filterDone: "Done",
+    focusSession: "FOCUS SESSION",
+    focusTitle: "Focus Timer",
+    focusDesc: "Stay focused on one thing right now.",
+    focusTimeLabel: "Focus Time",
+    remainingLabel: "Remaining",
+    startBtn: "Start",
+    pauseBtn: "Pause",
+    resetBtn: "Reset",
+    todayFocusLog: "Today's Focus Log",
+    emptyFocusTitle: "Build your focus log",
+    emptyFocusDesc: "Completed sessions are logged here with their start time.",
+    minuteUnit: "m",
+    hourUnit: "h",
+    // Analytics Platform
+    platformSub: "For a better day · Analytics Dashboard",
+    navAll: "Overview",
+    navWeekly: "Weekly & Tasks",
+    navFocus: "Focus Analytics",
+    pastelLight: "Pastel Light",
+    darkReport: "Dark Mode",
+    kpiTotalFocus: "Total Focus Time",
+    kpiWeekFocus: "Weekly Focus Time",
+    kpiTodayFocus: "Today's Focus Time",
+    kpiDoneTasks: "Completed Tasks",
+    kpiDoneBlocks: "Completed Blocks",
+    kpiAchievement: "Achievement Rate",
+    weeklyScheduleTitle: "Weekly Timetable (Click to Add / Edit)",
+    weeklyScheduleSub: "Click any slot to schedule with 7 pastel colors or mark as completed.",
+    timeCol: "Time",
+    weeklyStatsTitle: "Weekly Stats · Achievement",
+    completionRateTitle: "Completion Rate",
+    completionRateDesc: "Combined metric of completed weekly blocks (60%) and completed tasks (40%).",
+    totalPlanned: "Planned Time",
+    actualProgress: "Completed Time",
+    remainingTime: "Remaining Time",
+    tagRatioTitle: "Activity Ratio (by Task Tags)",
+    totalTasksCount: (n) => `${n} Tasks Total`,
+    emptyTagRatio: "Add tasks to see your tag distribution.",
+    todoListCardTitle: "To-Do List",
+    newTaskPlaceholder: "Add a new task...",
+    focusRecordTitle: "Stopwatch · Focus Session History",
+    focusRecordSub: "Hourly distribution of focus sessions over the last 10 days.",
+    addCurrentFocusBtn: "+ Log Session Now",
+    dateCol: "Date",
+    todayLabel: "Today",
+    yesterdayLabel: "Yesterday",
+    goalCardTitle: "Daily Focus Goal",
+    goalCardSub: (f, a, r) => `Focused: ${f}d · Achieved: ${a}d · Rate: ${r}%`,
+    goalBadge: "Goal:",
+    recentFocusLogTitle: "Recent Stopwatch Focus Logs",
+    startedAt: "Started",
+    // Modals
+    infoModalTitle: "About My Plan & License",
+    infoDesc: "A pastel productivity Chrome Extension featuring a daily timeline, tag-based to-do list, Pomodoro stopwatch, and weekly analytics.",
+    versionLabel: "Version",
+    licenseLabel: "License",
+    openSourceLabel: "Open Source Stack",
+    githubRepoBtn: "Visit GitHub Repository",
+    coffeeModalTitle: "Buy the Developer a Coffee",
+    coffeeModalDesc: "Has My Plan helped you organize your day? A warm cup of coffee supports continuous updates and new features!",
+    coffeeGlobalBtn: "Support on Buy Me a Coffee",
+    coffeeLocalTitle: "Quick QR Support (KakaoPay / Toss)",
+    // Google Sync
+    googleSectionTitle: "Google Calendar & Tasks Sync",
+    googleLoginBtn: "Connect with Google",
+    googleSyncNow: "Sync",
+    googleSyncing: "Syncing...",
+    googleLogout: "Disconnect",
+    googleClientIdBtn: "OAuth Client ID Setup",
+    googleModalTitle: "Google OAuth & Calendar/Tasks Setup",
+    googleModalDesc: "Enter your Google Cloud OAuth Client ID to enable two-way sync with Google Calendar and Google Tasks.",
+    redirectUriLabel: "1. Authorized Redirect URI (Copy & Register)",
+    clientIdLabel: "2. Google OAuth Client ID",
+    clientIdPlaceholder: "xxxx...apps.googleusercontent.com",
+    saveAndConnectBtn: "Save & Sign in with Google",
+    saveOnlyBtn: "Save Client ID",
+    lastSyncedLabel: "Last synced:",
+    copiedText: "Copied!",
+    copyText: "Copy",
+    // Weekday Routine Repeat
+    weekdayRepeatTitle: "Weekday Auto-Repeat (Mon–Fri)",
+    weekdayRepeatDesc: "Automatically applies your weekday schedule routine every Mon–Fri.",
+    weekdayRepeatCheck: "Repeat every weekday (Mon–Fri)",
+    weekdayRepeatShort: "Weekday Repeat",
+    saveAsWeekdayRoutine: "Save Today as Weekday Routine",
+    routineSavedToast: "Weekday routine applied!",
+  },
+};
+
+/* ==========================================================================
+   [가이드 5] 샘플 데이터 (설정에서 '샘플 데이터 채우기'를 누를 때만 사용됨)
+   - plan.md 0번에 따라 초기 실행 상태는 더미 데이터가 없는 빈 배열([])로 시작합니다.
+   ========================================================================== */
+const sampleTasks = [
   { id: 1, title: "부트캠프 강의 듣기", tag: "학습", done: true },
   { id: 2, title: "아침 유산소 운동하기", tag: "운동", done: true },
   { id: 3, title: "자격증 기출문제 풀이", tag: "공부", done: false },
@@ -81,7 +361,7 @@ const seedTasks = [
   { id: 6, title: "건강한 저녁 식사", tag: "식사", done: true },
 ];
 
-const seedEvents = [
+const sampleEvents = [
   { id: 1, title: "아침 운동", start: 7, end: 8, color: "sage" },
   { id: 2, title: "부트캠프 집중 학습", start: 10, end: 13, color: "sky" },
   { id: 3, title: "프로젝트 실습", start: 14, end: 17, color: "periwinkle" },
@@ -89,42 +369,16 @@ const seedEvents = [
   { id: 5, title: "자격증 공부", start: 21, end: 23, color: "rose" },
 ];
 
-// 요일 인덱스: 0(월) ~ 6(일)
-const seedWeeklyEvents = [
+const sampleWeeklyEvents = [
   { id: 101, day: 0, start: 7, end: 8, title: "아침 운동", color: "sage", done: true },
   { id: 102, day: 0, start: 9, end: 13, title: "부트캠프 강의", color: "sky", done: true },
   { id: 103, day: 0, start: 14, end: 18, title: "알고리즘 풀이", color: "periwinkle", done: true },
-  { id: 104, day: 0, start: 20, end: 22, title: "휴식 및 독서", color: "rose", done: true },
-
   { id: 105, day: 1, start: 9, end: 12, title: "프론트엔드 실습", color: "sky", done: true },
   { id: 106, day: 1, start: 13, end: 17, title: "팀 프로젝트", color: "periwinkle", done: true },
-  { id: 107, day: 1, start: 18, end: 20, title: "헬스장 운동", color: "sage", done: true },
-  { id: 108, day: 1, start: 21, end: 23, title: "자격증 복습", color: "butter", done: false },
-
-  { id: 109, day: 2, start: 7, end: 8, title: "모닝 러닝", color: "sage", done: true },
   { id: 110, day: 2, start: 10, end: 14, title: "부트캠프 라이브", color: "sky", done: true },
-  { id: 111, day: 2, start: 15, end: 18, title: "과제 제출", color: "peach", done: true },
-  { id: 112, day: 2, start: 20, end: 22, title: "영화 감상", color: "rose", done: true },
-
   { id: 113, day: 3, start: 9, end: 12, title: "리액트 심화 학습", color: "sky", done: true },
-  { id: 114, day: 3, start: 13, end: 17, title: "코딩 테스트 스터디", color: "periwinkle", done: true },
-  { id: 115, day: 3, start: 18, end: 19, title: "산책 및 스트레칭", color: "sage", done: false },
-  { id: 116, day: 3, start: 20, end: 22, title: "블로그 정리", color: "butter", done: true },
-
-  { id: 117, day: 4, start: 7, end: 8, title: "수영 강습", color: "sage", done: true },
   { id: 118, day: 4, start: 10, end: 15, title: "주간 프로젝트 마감", color: "sky", done: true },
-  { id: 119, day: 4, start: 16, end: 18, title: "코드 리뷰", color: "periwinkle", done: false },
-  { id: 120, day: 4, start: 20, end: 22, title: "자유 휴식", color: "rose", done: true },
-
-  { id: 121, day: 5, start: 7, end: 9, title: "주말 아침 운동", color: "sage", done: true },
-  { id: 122, day: 5, start: 10, end: 14, title: "자격증 모의고사", color: "sky", done: true },
-  { id: 123, day: 5, start: 15, end: 18, title: "개인 사이드 프로젝트", color: "periwinkle", done: false },
-  { id: 124, day: 5, start: 20, end: 22, title: "취미 및 휴식", color: "rose", done: false },
-
-  { id: 125, day: 6, start: 10, end: 12, title: "주간 회고 및 계획", color: "butter", done: false },
-  { id: 126, day: 6, start: 14, end: 17, title: "부족한 공부 보충", color: "sky", done: false },
-  { id: 127, day: 6, start: 18, end: 19, title: "가벼운 조깅", color: "sage", done: false },
-  { id: 128, day: 6, start: 20, end: 22, title: "재충전 휴식", color: "rose", done: false },
+  { id: 122, day: 5, start: 10, end: 14, title: "자격증 모의고사", color: "sky", done: false },
 ];
 
 function getIsoDate(offsetDays = 0) {
@@ -133,31 +387,44 @@ function getIsoDate(offsetDays = 0) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function formatKoreanOrder(n) {
+const sampleFocusSessions = [
+  { id: 204, date: getIsoDate(-1), startHour: 10, durationMinutes: 50, order: 1, timeStr: "10:00" },
+  { id: 205, date: getIsoDate(-1), startHour: 15, durationMinutes: 60, order: 2, timeStr: "15:20" },
+  { id: 207, date: getIsoDate(-2), startHour: 9, durationMinutes: 60, order: 1, timeStr: "09:00" },
+  { id: 209, date: getIsoDate(-3), startHour: 10, durationMinutes: 60, order: 1, timeStr: "10:15" },
+];
+
+function formatSessionOrder(n, lang) {
+  if (lang === "English") {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return `Session #${n} (${n + (s[(v - 20) % 10] || s[v] || s[0])})`;
+  }
   const names = ["첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째", "여섯 번째", "일곱 번째", "여덟 번째", "아홉 번째", "열 번째"];
   return names[n - 1] ? `${names[n - 1]} 세션` : `${n}번째 세션`;
 }
 
-// 과거 날짜 샘플 데이터 (오늘 기록은 실제 스탑워치 실행 시 실시간으로 쌓이도록 비워둠)
-const seedFocusSessions = [
-  { id: 204, date: getIsoDate(-1), startHour: 10, durationMinutes: 50, label: "첫 번째 세션", timeStr: "10:00" },
-  { id: 205, date: getIsoDate(-1), startHour: 15, durationMinutes: 60, label: "두 번째 세션", timeStr: "15:20" },
-  { id: 206, date: getIsoDate(-1), startHour: 20, durationMinutes: 50, label: "세 번째 세션", timeStr: "20:10" },
-  { id: 207, date: getIsoDate(-2), startHour: 9, durationMinutes: 60, label: "첫 번째 세션", timeStr: "09:00" },
-  { id: 208, date: getIsoDate(-2), startHour: 14, durationMinutes: 50, label: "두 번째 세션", timeStr: "14:30" },
-  { id: 209, date: getIsoDate(-3), startHour: 10, durationMinutes: 60, label: "첫 번째 세션", timeStr: "10:15" },
-  { id: 210, date: getIsoDate(-3), startHour: 16, durationMinutes: 60, label: "두 번째 세션", timeStr: "16:00" },
-  { id: 211, date: getIsoDate(-3), startHour: 21, durationMinutes: 60, label: "세 번째 세션", timeStr: "21:00" },
-  { id: 212, date: getIsoDate(-4), startHour: 11, durationMinutes: 50, label: "첫 번째 세션", timeStr: "11:00" },
-];
-
-function getHeaderDateParts() {
+function getHeaderDateParts(lang) {
   const d = new Date();
+  if (lang === "English") {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return {
+      yearText: `${d.getFullYear()}`,
+      dateText: `${months[d.getMonth()]} ${d.getDate()} (${weekdays[d.getDay()]})`,
+    };
+  }
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
   return {
     yearText: `${d.getFullYear()}년`,
     dateText: `${d.getMonth() + 1}월 ${d.getDate()}일(${weekdays[d.getDay()]})`,
   };
+}
+
+function getTagLabel(tagKey, lang) {
+  const cfg = TAG_CONFIG[tagKey];
+  if (!cfg) return tagKey;
+  return lang === "English" ? cfg.en : cfg.ko;
 }
 
 function loadLocal(key, fallback) {
@@ -176,70 +443,105 @@ export default function App() {
   }, []);
 
   const [tab, setTab] = useState("schedule");
-  const [tasks, setTasks] = useState(() => loadLocal("myplan-tasks-v2", seedTasks));
-  const [events, setEvents] = useState(() => loadLocal("myplan-events-v2", seedEvents));
-  const [weeklyEvents, setWeeklyEvents] = useState(() => loadLocal("myplan-weekly-events-v2", seedWeeklyEvents));
-  const [weeklyMemo, setWeeklyMemo] = useState(() =>
-    loadLocal(
-      "myplan-weekly-memo",
-      "이번 주는 부트캠프에 집중한 한 주였다. 다음 주에는 운동도 꾸준히 하고, 자격증 공부도 더 신경 써야겠다!"
-    )
-  );
-  const [focusSessions, setFocusSessions] = useState(() => loadLocal("myplan-focus-sessions-v2", seedFocusSessions));
+  // plan.md 0번 반영: 더미 데이터 없이 빈 배열([])을 기본값으로 시작 (키 버전 v3)
+  const [tasks, setTasks] = useState(() => loadLocal("myplan-tasks-v3", []));
+  const [events, setEvents] = useState(() => loadLocal("myplan-events-v3", []));
+  const [weeklyEvents, setWeeklyEvents] = useState(() => loadLocal("myplan-weekly-events-v3", []));
+  const [focusSessions, setFocusSessions] = useState(() => loadLocal("myplan-focus-sessions-v3", []));
   const [dailyGoalHours, setDailyGoalHours] = useState(() => loadLocal("myplan-goal-hours", 3));
 
   const [dark, setDark] = useState(() => loadLocal("myplan-dark", false));
+  const [language, setLanguage] = useState(() => loadLocal("myplan-lang", "한국어"));
+  const [rating, setRating] = useState(() => loadLocal("myplan-rating", 0));
+
+  // [평일 루틴 자동 반복(월~금) 상태]
+  const [weekdayRepeat, setWeekdayRepeat] = useState(() =>
+    loadLocal("myplan-weekday-repeat", false)
+  );
+  const [weekdayTemplates, setWeekdayTemplates] = useState(() =>
+    loadLocal("myplan-weekday-templates", [])
+  );
+
   const [showSettings, setShowSettings] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showCoffeeModal, setShowCoffeeModal] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [showWeekly, setShowWeekly] = useState(isReportPageFromUrl);
 
-  // [1] Daily Schedule 타임라인 시간 범위 및 일정 추가/수정 상태 (3번째 사진 UI 반영)
-  const [startHour, setStartHour] = useState(() => loadLocal("myplan-start-hour", 6));
-  const [endHour, setEndHour] = useState(() => loadLocal("myplan-end-hour", 23));
+  // [Google OAuth & 캘린더/할일 양방향 연동 상태]
+  const [googleToken, setGoogleToken] = useState(() => loadLocal("myplan-google-token", ""));
+  const [googleUser, setGoogleUser] = useState(() => loadLocal("myplan-google-user", null));
+  const [googleClientId, setGoogleClientId] = useState(() => loadLocal("myplan-google-client-id", ""));
+  const [clientIdInput, setClientIdInput] = useState(() => loadLocal("myplan-google-client-id", ""));
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => loadLocal("myplan-google-last-sync", ""));
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [copiedRedirect, setCopiedRedirect] = useState(false);
+
+  // [1] Daily Schedule 타임라인 시간 범위: 확장프로그램을 켤 때마다 현재 시각(시)이 맨 위에 오도록 설정
+  // 예: 12:49에 켜면 12:00부터 시작, 15:30에 켜면 15:00부터 시작
+  const [startHour, setStartHour] = useState(() => new Date().getHours());
+  const [endHour, setEndHour] = useState(() =>
+    Math.max(new Date().getHours(), loadLocal("myplan-end-hour", 23))
+  );
   const [activeSlotHour, setActiveSlotHour] = useState(null);
   const [editingEventId, setEditingEventId] = useState(null);
   const [slotTitle, setSlotTitle] = useState("");
   const [slotStartHour, setSlotStartHour] = useState(7);
   const [slotEndHour, setSlotEndHour] = useState(8);
   const [slotColor, setSlotColor] = useState("sage");
+  const [slotRepeatWeekday, setSlotRepeatWeekday] = useState(false);
 
-  // [2] To-Do List 입력 상태 (시간 제거, 할 일 제목 + 태그만 유지)
+  // [2] To-Do List 입력 상태
   const [newTask, setNewTask] = useState("");
   const [newTaskTag, setNewTaskTag] = useState("학습");
-  const [filter, setFilter] = useState("전체");
+  const [filter, setFilter] = useState("ALL"); // "ALL" | "ACTIVE" | "DONE"
 
-  // [3] Stopwatch 상태 (2번째 사진처럼 입력칸 제거 + 실제 시작 시각 기록)
+  // [3] Stopwatch 상태
   const [minutes, setMinutes] = useState(25);
   const [remaining, setRemaining] = useState(25 * 60);
   const [running, setRunning] = useState(false);
-  const sessionStartRef = useRef(null); // 타이머 '시작하기'를 누른 실제 Date 저장
-  const [language, setLanguage] = useState("한국어");
+  const sessionStartRef = useRef(null);
+
+  const t = UI_TEXT[language] || UI_TEXT["한국어"];
 
   // LocalStorage 동기화
-  useEffect(() => localStorage.setItem("myplan-tasks-v2", JSON.stringify(tasks)), [tasks]);
-  useEffect(() => localStorage.setItem("myplan-events-v2", JSON.stringify(events)), [events]);
-  useEffect(() => localStorage.setItem("myplan-weekly-events-v2", JSON.stringify(weeklyEvents)), [weeklyEvents]);
-  useEffect(() => localStorage.setItem("myplan-weekly-memo", JSON.stringify(weeklyMemo)), [weeklyMemo]);
-  useEffect(() => localStorage.setItem("myplan-focus-sessions-v2", JSON.stringify(focusSessions)), [focusSessions]);
+  useEffect(() => localStorage.setItem("myplan-tasks-v3", JSON.stringify(tasks)), [tasks]);
+  useEffect(() => localStorage.setItem("myplan-events-v3", JSON.stringify(events)), [events]);
+  useEffect(() => localStorage.setItem("myplan-weekly-events-v3", JSON.stringify(weeklyEvents)), [weeklyEvents]);
+  useEffect(() => localStorage.setItem("myplan-focus-sessions-v3", JSON.stringify(focusSessions)), [focusSessions]);
   useEffect(() => localStorage.setItem("myplan-goal-hours", JSON.stringify(dailyGoalHours)), [dailyGoalHours]);
   useEffect(() => localStorage.setItem("myplan-dark", JSON.stringify(dark)), [dark]);
-  useEffect(() => localStorage.setItem("myplan-start-hour", JSON.stringify(startHour)), [startHour]);
+  useEffect(() => localStorage.setItem("myplan-lang", JSON.stringify(language)), [language]);
+  useEffect(() => localStorage.setItem("myplan-rating", JSON.stringify(rating)), [rating]);
   useEffect(() => localStorage.setItem("myplan-end-hour", JSON.stringify(endHour)), [endHour]);
+  useEffect(() => localStorage.setItem("myplan-google-token", JSON.stringify(googleToken)), [googleToken]);
+  useEffect(() => localStorage.setItem("myplan-google-user", JSON.stringify(googleUser)), [googleUser]);
+  useEffect(() => localStorage.setItem("myplan-google-client-id", JSON.stringify(googleClientId)), [googleClientId]);
+  useEffect(() => localStorage.setItem("myplan-google-last-sync", JSON.stringify(lastSyncedAt)), [lastSyncedAt]);
+  useEffect(() => localStorage.setItem("myplan-weekday-repeat", JSON.stringify(weekdayRepeat)), [weekdayRepeat]);
+  useEffect(() => localStorage.setItem("myplan-weekday-templates", JSON.stringify(weekdayTemplates)), [weekdayTemplates]);
 
   // 팝업과 전체 분석 웹사이트 간 실시간 동기화
   useEffect(() => {
     function handleStorage(e) {
-      if (e.key === "myplan-tasks-v2" && e.newValue) setTasks(JSON.parse(e.newValue));
-      if (e.key === "myplan-events-v2" && e.newValue) setEvents(JSON.parse(e.newValue));
-      if (e.key === "myplan-weekly-events-v2" && e.newValue) setWeeklyEvents(JSON.parse(e.newValue));
-      if (e.key === "myplan-weekly-memo" && e.newValue) setWeeklyMemo(JSON.parse(e.newValue));
-      if (e.key === "myplan-focus-sessions-v2" && e.newValue) setFocusSessions(JSON.parse(e.newValue));
+      if (e.key === "myplan-tasks-v3" && e.newValue) setTasks(JSON.parse(e.newValue));
+      if (e.key === "myplan-events-v3" && e.newValue) setEvents(JSON.parse(e.newValue));
+      if (e.key === "myplan-weekly-events-v3" && e.newValue) setWeeklyEvents(JSON.parse(e.newValue));
+      if (e.key === "myplan-focus-sessions-v3" && e.newValue) setFocusSessions(JSON.parse(e.newValue));
       if (e.key === "myplan-dark" && e.newValue) setDark(JSON.parse(e.newValue));
+      if (e.key === "myplan-lang" && e.newValue) setLanguage(JSON.parse(e.newValue));
+      if (e.key === "myplan-google-token" && e.newValue) setGoogleToken(JSON.parse(e.newValue));
+      if (e.key === "myplan-google-user" && e.newValue) setGoogleUser(JSON.parse(e.newValue));
+      if (e.key === "myplan-google-last-sync" && e.newValue) setLastSyncedAt(JSON.parse(e.newValue));
+      if (e.key === "myplan-weekday-repeat" && e.newValue) setWeekdayRepeat(JSON.parse(e.newValue));
+      if (e.key === "myplan-weekday-templates" && e.newValue) setWeekdayTemplates(JSON.parse(e.newValue));
     }
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // 스탑워치 세션 기록 저장 헬퍼 (실제 시작한 시각 기반, 오늘 날짜 기준으로 순서 부여)
+  // 스탑워치 세션 기록 저장 헬퍼
   function recordFocusSession(durationMin) {
     const startObj = sessionStartRef.current || new Date();
     const startHourVal = startObj.getHours();
@@ -253,8 +555,8 @@ export default function App() {
         date: todayKey,
         startHour: startHourVal,
         durationMinutes: durationMin,
-        label: formatKoreanOrder(todayCount + 1),
-        timeStr, // 실제 '시작하기'를 누른 시각 (예: 09:10)
+        order: todayCount + 1,
+        timeStr,
       };
       return [newSession, ...prev];
     });
@@ -278,18 +580,26 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [running, minutes]);
 
-  const headerDate = getHeaderDateParts();
-  const doneCount = tasks.filter((t) => t.done).length;
+  const headerDate = getHeaderDateParts(language);
+  const doneCount = tasks.filter((item) => item.done).length;
   const filteredTasks = useMemo(
     () =>
-      tasks.filter((t) =>
-        filter === "전체" ? true : filter === "오늘" ? !t.done : t.done
+      tasks.filter((item) =>
+        filter === "ALL" ? true : filter === "ACTIVE" ? !item.done : item.done
       ),
     [tasks, filter]
   );
 
   const formatTime = (s) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  function openExternalUrl(url) {
+    if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+      chrome.tabs.create({ url });
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 
   function openAnalyticsWebsite() {
     const reportUrl = `${window.location.origin}${window.location.pathname}?page=report`;
@@ -301,7 +611,246 @@ export default function App() {
     setShowWeekly(true);
   }
 
-  // [1] 타임라인 슬롯 클릭 시 일정 입력창 열기 (3번째 사진 스타일)
+  // 데이터 관리: 샘플 데이터 채우기 / 전체 초기화
+  function handleLoadSampleData() {
+    setTasks(sampleTasks);
+    setEvents(sampleEvents);
+    setWeeklyEvents(sampleWeeklyEvents);
+    setFocusSessions(sampleFocusSessions);
+    setShowSettings(false);
+  }
+
+  function handleClearAllData() {
+    if (!window.confirm(t.confirmClear)) return;
+    setTasks([]);
+    setEvents([]);
+    setWeeklyEvents([]);
+    setFocusSessions([]);
+    setShowSettings(false);
+  }
+
+  /* ==========================================================================
+     [Google OAuth 로그인 & Google Calendar / Tasks 양방향 동기화 핸들러]
+     ========================================================================== */
+  async function syncAllWithGoogle(tokenToUse = googleToken) {
+    if (!tokenToUse) return;
+    setIsSyncing(true);
+    setSyncError("");
+    try {
+      // 1) 프로필 확인
+      const profile = await fetchGoogleUserProfile(tokenToUse);
+      if (profile?.email) {
+        setGoogleUser({
+          email: profile.email,
+          name: profile.name || profile.email.split("@")[0],
+          picture: profile.picture || "",
+        });
+      }
+
+      // 2) 구글 캘린더 일정 불러오기 (오늘 + 이번 주)
+      const { dailyEvents: gDaily, weeklyEvents: gWeekly } =
+        await fetchGoogleCalendarEvents(tokenToUse);
+
+      setEvents((prev) => {
+        const localOnly = prev.filter((ev) => !ev.googleEventId);
+        return [...localOnly, ...gDaily];
+      });
+
+      setWeeklyEvents((prev) => {
+        const localOnly = prev.filter((ev) => !ev.googleEventId);
+        return [...localOnly, ...gWeekly];
+      });
+
+      // 3) 구글 Tasks 할 일 불러오기
+      const gTasks = await fetchGoogleTasks(tokenToUse);
+      setTasks((prev) => {
+        const localOnly = prev.filter((item) => !item.googleTaskId);
+        return [...localOnly, ...gTasks];
+      });
+
+      const now = new Date();
+      setLastSyncedAt(
+        `${String(now.getHours()).padStart(2, "0")}:${String(
+          now.getMinutes()
+        ).padStart(2, "0")}`
+      );
+    } catch (err) {
+      if (err?.code === 401 || err?.message === "TOKEN_EXPIRED") {
+        setGoogleToken("");
+        setGoogleUser(null);
+        setSyncError(
+          language === "English"
+            ? "Session expired. Please sign in again."
+            : "구글 인증이 만료되었습니다. 다시 로그인해 주세요."
+        );
+      } else {
+        setSyncError(err?.message || "Sync failed");
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
+  async function handleGoogleLogin(overrideClientId) {
+    setSyncError("");
+    const activeCid = getActiveClientId(
+      overrideClientId !== undefined ? overrideClientId : googleClientId
+    );
+    try {
+      setIsSyncing(true);
+      const token = await loginWithGoogle(activeCid);
+      setGoogleToken(token);
+      setShowGoogleModal(false);
+      await syncAllWithGoogle(token);
+    } catch (err) {
+      if (err?.message === "NEED_CLIENT_ID") {
+        setShowSettings(false);
+        setShowGoogleModal(true);
+      } else {
+        setSyncError(err?.message || "Google 로그인 실패");
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
+  async function handleGoogleLogout() {
+    await logoutGoogle(googleToken);
+    setGoogleToken("");
+    setGoogleUser(null);
+    setLastSyncedAt("");
+    setSyncError("");
+  }
+
+  /* ==========================================================================
+     [평일 루틴 자동 반복 (월~금) 로직]
+     - 평일 반복을 켜면:
+       1) 현재 오늘의 일정(events)이나 주간 계획표의 평일 일정에서 루틴 템플릿을 구성하고
+       2) 주간 계획표의 월~금(day 0~4) 전체에 해당 루틴이 자동으로 채워지며
+       3) 평일(월~금)에 확장프로그램을 열었을 때 오늘의 타임라인(events)에도 루틴이 자동 반영됩니다.
+     ========================================================================== */
+  function applyTemplatesToWeekAndToday(templatesToApply) {
+    if (!templatesToApply || templatesToApply.length === 0) return;
+
+    // 1) 주간 계획표 월(0)~금(4)에 루틴 자동 배치 (중복 방지)
+    setWeeklyEvents((prev) => {
+      const next = [...prev];
+      for (let d = 0; d <= 4; d++) {
+        templatesToApply.forEach((tpl) => {
+          const exists = next.some(
+            (ev) => ev.day === d && ev.start === tpl.start
+          );
+          if (!exists) {
+            next.push({
+              id: `routine-w-${d}-${tpl.start}-${Date.now()}`,
+              routineId: tpl.id,
+              isWeekdayRoutine: true,
+              day: d,
+              start: tpl.start,
+              end: tpl.end,
+              title: tpl.title,
+              color: tpl.color || "sky",
+              done: false,
+            });
+          }
+        });
+      }
+      return next;
+    });
+
+    // 2) 오늘의 타임라인에도 자동 반영 (오늘이 평일이거나 사용자가 즉시 확인하고 싶을 때)
+    setEvents((prev) => {
+      const next = [...prev];
+      templatesToApply.forEach((tpl) => {
+        const exists = next.some((ev) => ev.start === tpl.start);
+        if (!exists) {
+          next.push({
+            id: `routine-d-${tpl.start}-${Date.now()}`,
+            routineId: tpl.id,
+            isWeekdayRoutine: true,
+            title: tpl.title,
+            start: tpl.start,
+            end: tpl.end,
+            color: tpl.color || "sky",
+          });
+        }
+      });
+      return next;
+    });
+  }
+
+  function toggleWeekdayRepeatMode(nextValue) {
+    const targetState =
+      typeof nextValue === "boolean" ? nextValue : !weekdayRepeat;
+    setWeekdayRepeat(targetState);
+
+    if (targetState) {
+      let activeTemplates = weekdayTemplates;
+
+      // 아직 저장된 평일 루틴 템플릿이 없다면 현재 오늘의 일정 또는 월요일 일정에서 자동 추출
+      if (activeTemplates.length === 0) {
+        if (events.length > 0) {
+          activeTemplates = events.map((ev) => ({
+            id: `tpl-${ev.start}-${Date.now()}`,
+            title: ev.title,
+            start: ev.start,
+            end: ev.end,
+            color: ev.color || "sky",
+          }));
+        } else {
+          const weekdaySource = weeklyEvents.filter(
+            (ev) => ev.day >= 0 && ev.day <= 4
+          );
+          const byStart = new Map();
+          weekdaySource.forEach((ev) => {
+            if (!byStart.has(ev.start)) {
+              byStart.set(ev.start, {
+                id: `tpl-${ev.start}-${Date.now()}`,
+                title: ev.title,
+                start: ev.start,
+                end: ev.end,
+                color: ev.color || "sky",
+              });
+            }
+          });
+          activeTemplates = Array.from(byStart.values());
+        }
+        if (activeTemplates.length > 0) {
+          setWeekdayTemplates(activeTemplates);
+        }
+      }
+
+      if (activeTemplates.length > 0) {
+        applyTemplatesToWeekAndToday(activeTemplates);
+      }
+    }
+  }
+
+  // 현재 오늘의 타임라인(events) 전체를 평일(월~금) 루틴으로 즉시 저장 및 적용
+  function saveCurrentDailyAsWeekdayRoutine() {
+    if (events.length === 0) return;
+    const newTemplates = events.map((ev) => ({
+      id: `tpl-${ev.start}-${Date.now()}`,
+      title: ev.title,
+      start: ev.start,
+      end: ev.end,
+      color: ev.color || "sky",
+    }));
+    setWeekdayTemplates(newTemplates);
+    setWeekdayRepeat(true);
+    applyTemplatesToWeekAndToday(newTemplates);
+  }
+
+  // 앱 실행 시 평일 반복이 켜져 있고 오늘이 월~금(1~5)이면 루틴이 빠져 있을 때 자동으로 채워줌
+  useEffect(() => {
+    if (!weekdayRepeat || weekdayTemplates.length === 0) return;
+    const jsDay = new Date().getDay(); // 1(월) ~ 5(금)
+    if (jsDay >= 1 && jsDay <= 5) {
+      applyTemplatesToWeekAndToday(weekdayTemplates);
+    }
+  }, [weekdayRepeat]);
+
+  // [1] 타임라인 슬롯 클릭 시 일정 입력창 열기
   function openSlotForm(hour, existingEvent = null) {
     if (existingEvent) {
       setEditingEventId(existingEvent.id);
@@ -310,6 +859,7 @@ export default function App() {
       setSlotStartHour(existingEvent.start);
       setSlotEndHour(existingEvent.end);
       setSlotColor(existingEvent.color || "sage");
+      setSlotRepeatWeekday(Boolean(existingEvent.isWeekdayRoutine || weekdayRepeat));
     } else {
       setEditingEventId(null);
       setActiveSlotHour(hour);
@@ -317,57 +867,189 @@ export default function App() {
       setSlotStartHour(hour);
       setSlotEndHour(Math.min(24, hour + 1));
       setSlotColor("sage");
+      setSlotRepeatWeekday(Boolean(weekdayRepeat));
     }
   }
 
-  function saveSlotEvent(e) {
+  async function saveSlotEvent(e) {
     e?.preventDefault();
     if (activeSlotHour === null || !slotTitle.trim()) return;
     const sHour = Number(slotStartHour);
     const eHour = Math.max(sHour + 1, Number(slotEndHour));
+    const cleanTitle = slotTitle.trim();
+    const targetId = editingEventId;
+    const existingObj = events.find((ev) => ev.id === targetId);
+    const repeatOnWeekdays = Boolean(slotRepeatWeekday);
 
-    if (editingEventId) {
-      setEvents((prev) =>
-        prev.map((ev) =>
-          ev.id === editingEventId
-            ? { ...ev, title: slotTitle.trim(), start: sHour, end: eHour, color: slotColor }
-            : ev
-        )
-      );
-    } else {
-      setEvents((prev) => [
-        ...prev.filter((ev) => ev.start !== sHour),
-        {
-          id: Date.now(),
-          title: slotTitle.trim(),
-          start: sHour,
-          end: eHour,
-          color: slotColor,
-        },
-      ]);
-    }
     setActiveSlotHour(null);
     setEditingEventId(null);
     setSlotTitle("");
+
+    // 평일 반복 체크박스가 켜져 있으면 평일 루틴 템플릿 및 주간 시간표(월~금)에도 동시 반영
+    if (repeatOnWeekdays) {
+      const tplItem = {
+        id: `tpl-${sHour}-${Date.now()}`,
+        title: cleanTitle,
+        start: sHour,
+        end: eHour,
+        color: slotColor,
+      };
+      setWeekdayTemplates((prev) => [
+        ...prev.filter((tItem) => tItem.start !== sHour),
+        tplItem,
+      ]);
+      setWeekdayRepeat(true);
+      setWeeklyEvents((prev) => {
+        const filtered = prev.filter(
+          (ev) => !(ev.day >= 0 && ev.day <= 4 && ev.start === sHour)
+        );
+        const added = [0, 1, 2, 3, 4].map((d) => ({
+          id: `routine-w-${d}-${sHour}-${Date.now()}`,
+          routineId: tplItem.id,
+          isWeekdayRoutine: true,
+          day: d,
+          start: sHour,
+          end: eHour,
+          title: cleanTitle,
+          color: slotColor,
+          done: false,
+        }));
+        return [...filtered, ...added];
+      });
+    }
+
+    if (targetId) {
+      setEvents((prev) =>
+        prev.map((ev) =>
+          ev.id === targetId
+            ? {
+                ...ev,
+                title: cleanTitle,
+                start: sHour,
+                end: eHour,
+                color: slotColor,
+                isWeekdayRoutine: repeatOnWeekdays,
+              }
+            : ev
+        )
+      );
+      if (googleToken && existingObj?.googleEventId) {
+        try {
+          await updateGoogleCalendarEvent(googleToken, existingObj.googleEventId, {
+            title: cleanTitle,
+            start: sHour,
+            end: eHour,
+            color: slotColor,
+          });
+        } catch (err) {
+          console.warn("Google Calendar 수정 실패:", err);
+        }
+      }
+    } else {
+      const tempId = Date.now();
+      const newEv = {
+        id: tempId,
+        title: cleanTitle,
+        start: sHour,
+        end: eHour,
+        color: slotColor,
+        isWeekdayRoutine: repeatOnWeekdays,
+      };
+      setEvents((prev) => [...prev.filter((ev) => ev.start !== sHour), newEv]);
+
+      if (googleToken) {
+        try {
+          const created = await createGoogleCalendarEvent(googleToken, newEv);
+          if (created?.id) {
+            setEvents((prev) =>
+              prev.map((ev) =>
+                ev.id === tempId ? { ...ev, googleEventId: created.id } : ev
+              )
+            );
+          }
+        } catch (err) {
+          console.warn("Google Calendar 일정 생성 실패:", err);
+        }
+      }
+    }
   }
 
-  // [2] To-Do 할 일 추가 (시간 제거, 제목 + 태그만 저장)
+  async function deleteDailyEvent(evObj) {
+    if (!evObj) return;
+    setEvents((prev) => prev.filter((x) => x.id !== evObj.id));
+    if (googleToken && evObj.googleEventId) {
+      try {
+        await deleteGoogleCalendarEvent(googleToken, evObj.googleEventId);
+      } catch (err) {
+        console.warn("Google Calendar 일정 삭제 실패:", err);
+      }
+    }
+  }
+
+  // [2] To-Do 할 일 추가 / 완료 토글 / 삭제 (Google Tasks 실시간 연동 포함)
+  async function createNewTaskItem(titleText, tagValue) {
+    const clean = titleText.trim();
+    if (!clean) return;
+    const tempId = Date.now();
+    const newItem = {
+      id: tempId,
+      title: clean,
+      tag: tagValue || "학습",
+      done: false,
+    };
+    setTasks((prev) => [...prev, newItem]);
+
+    if (googleToken) {
+      try {
+        const created = await createGoogleTask(googleToken, newItem);
+        if (created?.id) {
+          setTasks((prev) =>
+            prev.map((item) =>
+              item.id === tempId ? { ...item, googleTaskId: created.id } : item
+            )
+          );
+        }
+      } catch (err) {
+        console.warn("Google Tasks 생성 실패:", err);
+      }
+    }
+  }
+
   function addTask(e) {
     e?.preventDefault();
     if (!newTask.trim()) return;
-    setTasks((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        title: newTask.trim(),
-        tag: newTaskTag || "학습",
-        done: false,
-      },
-    ]);
+    createNewTaskItem(newTask, newTaskTag);
     setNewTask("");
   }
 
-  // [3] 스탑워치 제어 (시작 시 실제 현재 시간 기록, 1분 이상 집중 후 초기화 시에도 누적 기록)
+  async function toggleTaskDone(taskObj) {
+    const nextDone = !taskObj.done;
+    setTasks((prev) =>
+      prev.map((item) =>
+        item.id === taskObj.id ? { ...item, done: nextDone } : item
+      )
+    );
+    if (googleToken && taskObj.googleTaskId) {
+      try {
+        await updateGoogleTaskStatus(googleToken, taskObj.googleTaskId, nextDone);
+      } catch (err) {
+        console.warn("Google Tasks 상태 업데이트 실패:", err);
+      }
+    }
+  }
+
+  async function removeTaskItem(taskObj) {
+    setTasks((prev) => prev.filter((item) => item.id !== taskObj.id));
+    if (googleToken && taskObj.googleTaskId) {
+      try {
+        await deleteGoogleTask(googleToken, taskObj.googleTaskId);
+      } catch (err) {
+        console.warn("Google Tasks 삭제 실패:", err);
+      }
+    }
+  }
+
+  // [3] 스탑워치 제어
   function toggleTimer() {
     if (!running) {
       if (!sessionStartRef.current) {
@@ -381,7 +1063,6 @@ export default function App() {
 
   function resetTimer() {
     const elapsedSeconds = minutes * 60 - remaining;
-    // 1분(60초) 이상 집중한 상태에서 초기화를 누르면 그때까지 집중한 시간(분)을 오늘의 기록에 자동 누적
     if (elapsedSeconds >= 60) {
       recordFocusSession(Math.round(elapsedSeconds / 60));
     } else {
@@ -403,8 +1084,6 @@ export default function App() {
     return Array.from({ length: count }, (_, i) => startHour + i);
   }, [startHour, endHour]);
 
-  // 오늘의 집중 기록: 오늘 날짜(getIsoDate(0))인 기록만 필터링하므로 자정이 지나면 자동으로 초기화됨
-  // 오래된 순서(첫 번째 세션 -> 두 번째 세션...)로 정렬하여 아래로 차곡차곡 쌓이게 표시
   const todayFocusSessions = useMemo(
     () =>
       focusSessions
@@ -421,8 +1100,6 @@ export default function App() {
         setEvents={setEvents}
         weeklyEvents={weeklyEvents}
         setWeeklyEvents={setWeeklyEvents}
-        weeklyMemo={weeklyMemo}
-        setWeeklyMemo={setWeeklyMemo}
         tasks={tasks}
         setTasks={setTasks}
         focusSessions={focusSessions}
@@ -431,12 +1108,21 @@ export default function App() {
         setDailyGoalHours={setDailyGoalHours}
         dark={dark}
         setDark={setDark}
-        onBack={() => {
-          if (isReportPageFromUrl) {
-            window.history.replaceState({}, "", window.location.pathname);
-          }
-          setShowWeekly(false);
-        }}
+        language={language}
+        setLanguage={setLanguage}
+        googleToken={googleToken}
+        googleUser={googleUser}
+        isSyncing={isSyncing}
+        lastSyncedAt={lastSyncedAt}
+        onSyncGoogle={() => syncAllWithGoogle(googleToken)}
+        onGoogleLogin={() => handleGoogleLogin()}
+        onCreateTask={createNewTaskItem}
+        onToggleTask={toggleTaskDone}
+        onDeleteTask={removeTaskItem}
+        weekdayRepeat={weekdayRepeat}
+        onToggleWeekdayRepeat={toggleWeekdayRepeatMode}
+        weekdayTemplates={weekdayTemplates}
+        setWeekdayTemplates={setWeekdayTemplates}
       />
     );
   }
@@ -455,16 +1141,16 @@ export default function App() {
           </div>
           <button
             className="icon-button header-icon"
-            aria-label="설정"
-            title="설정"
+            aria-label={t.settings}
+            title={t.settings}
             onClick={() => setShowSettings((v) => !v)}
           >
             <Settings size={20} />
           </button>
           <button
             className="icon-button header-icon"
-            aria-label="전체 분석 플랫폼 열기"
-            title="전체 분석 웹사이트 열기"
+            aria-label={t.openAnalytics}
+            title={t.openAnalytics}
             onClick={openAnalyticsWebsite}
           >
             <BarChart3 size={20} />
@@ -500,26 +1186,105 @@ export default function App() {
           </button>
         </nav>
 
-        {/* 설정 팝오버 */}
+        {/* 설정 팝오버 (구글 인증·캘린더/할일 연동, Rate Us, 데이터 초기화, 커피 후원 & ? 정보 모달) */}
         {showSettings && (
           <section className="settings-popover">
             <div className="settings-title">
-              <Settings size={15} /> 빠른 설정
+              <Settings size={15} /> {t.settings}
               <button className="icon-button" onClick={() => setShowSettings(false)}>
                 <X size={15} />
               </button>
             </div>
+
+            {/* Google 계정 인증 & 캘린더/Tasks 양방향 연동 카드 */}
+            <div className="setting-google-card">
+              <div className="setting-google-top">
+                <span className="google-badge-title">
+                  <Cloud size={14} /> {t.googleSectionTitle}
+                </span>
+                <button
+                  type="button"
+                  className="google-key-btn"
+                  title={t.googleClientIdBtn}
+                  onClick={() => {
+                    setClientIdInput(googleClientId);
+                    setShowSettings(false);
+                    setShowGoogleModal(true);
+                  }}
+                >
+                  <KeyRound size={12} />
+                </button>
+              </div>
+
+              {googleToken ? (
+                <div className="google-connected-box">
+                  <div className="google-user-row">
+                    {googleUser?.picture ? (
+                      <img
+                        src={googleUser.picture}
+                        alt=""
+                        className="google-avatar"
+                      />
+                    ) : (
+                      <div className="google-avatar-fallback">G</div>
+                    )}
+                    <div className="google-user-meta">
+                      <b>{googleUser?.name || "Google User"}</b>
+                      <small>{googleUser?.email || "Connected"}</small>
+                    </div>
+                  </div>
+                  <div className="google-sync-actions">
+                    <button
+                      type="button"
+                      className="google-sync-btn"
+                      disabled={isSyncing}
+                      onClick={() => syncAllWithGoogle(googleToken)}
+                    >
+                      <RotateCw size={12} className={isSyncing ? "spin-icon" : ""} />
+                      {isSyncing ? t.googleSyncing : t.googleSyncNow}
+                    </button>
+                    <button
+                      type="button"
+                      className="google-logout-btn"
+                      onClick={handleGoogleLogout}
+                    >
+                      <LogOut size={12} /> {t.googleLogout}
+                    </button>
+                  </div>
+                  {lastSyncedAt && (
+                    <small className="google-last-sync">
+                      {t.lastSyncedLabel} {lastSyncedAt}
+                    </small>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="google-login-btn"
+                  disabled={isSyncing}
+                  onClick={() => handleGoogleLogin()}
+                >
+                  <Cloud size={14} />
+                  <span>{isSyncing ? t.googleSyncing : t.googleLoginBtn}</span>
+                </button>
+              )}
+
+              {syncError && <div className="google-sync-error">{syncError}</div>}
+            </div>
+
             <button className="setting-row" onClick={() => setDark((v) => !v)}>
-              {dark ? <Sun size={16} /> : <Moon size={16} />} 테마
-              <span>{dark ? "다크" : "라이트"}</span>
+              {dark ? <Sun size={16} /> : <Moon size={16} />} {t.theme}
+              <span>{dark ? t.dark : t.light}</span>
             </button>
+
             <label className="setting-row">
-              <Languages size={16} /> 언어
+              <Languages size={16} /> {t.langLabel}
               <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                <option>한국어</option>
-                <option>English</option>
+                <option value="한국어">한국어</option>
+                <option value="English">English</option>
               </select>
             </label>
+
             <button
               className="setting-row"
               onClick={() => {
@@ -527,17 +1292,269 @@ export default function App() {
                 openAnalyticsWebsite();
               }}
             >
-              <CalendarRange size={16} /> 전체 분석 플랫폼 열기 <ExternalLink size={14} />
+              <CalendarRange size={16} /> {t.openAnalytics} <ExternalLink size={14} />
             </button>
+
+            {/* 평일 루틴 자동 반복 (월~금) 토글 */}
+            <div className="setting-routine-box">
+              <div className="setting-routine-top">
+                <div className="setting-routine-label">
+                  <div className="setting-routine-title-row">
+                    <Repeat size={13} className="routine-icon-accent" />
+                    <b>{t.weekdayRepeatTitle}</b>
+                  </div>
+                  <small className="setting-routine-desc">{t.weekdayRepeatDesc}</small>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={weekdayRepeat}
+                  className={`ios-switch ${weekdayRepeat ? "on" : ""}`}
+                  onClick={() => toggleWeekdayRepeatMode(!weekdayRepeat)}
+                >
+                  <span className="ios-switch-thumb" />
+                </button>
+              </div>
+              {events.length > 0 && (
+                <button
+                  type="button"
+                  className="routine-save-today-btn"
+                  onClick={saveCurrentDailyAsWeekdayRoutine}
+                >
+                  <Repeat size={12} /> {t.saveAsWeekdayRoutine}
+                </button>
+              )}
+            </div>
+
+            {/* Rate Us (별점 남기기) */}
+            <div className="setting-rate-box">
+              <div className="setting-rate-header">
+                <Star size={15} className="star-icon-accent" />
+                <span>{t.rateUs}</span>
+              </div>
+              <div className="star-rating-row">
+                {[1, 2, 3, 4, 5].map((starNum) => (
+                  <button
+                    key={starNum}
+                    type="button"
+                    className={`star-btn ${rating >= starNum ? "filled" : ""}`}
+                    onClick={() => setRating(starNum)}
+                    aria-label={`${starNum} star`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+              {rating > 0 && (
+                <button
+                  type="button"
+                  className="rate-store-link"
+                  onClick={() => openExternalUrl(APP_META.chromeStoreReviewUrl)}
+                >
+                  {t.openStore} <ExternalLink size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* 데이터 관리 (샘플 채우기 / 전체 초기화) */}
+            <div className="setting-data-actions">
+              <button type="button" className="data-btn" onClick={handleLoadSampleData}>
+                <Database size={13} /> {t.loadSample}
+              </button>
+              <button type="button" className="data-btn danger" onClick={handleClearAllData}>
+                <RotateCw size={13} /> {t.clearAllData}
+              </button>
+            </div>
+
+            {/* 설정 맨 밑 하단 바: ☕ 후원하기 버튼 + ? 정보/라이선스 버튼 */}
+            <div className="settings-bottom-bar">
+              <button
+                type="button"
+                className="coffee-pill-btn"
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowCoffeeModal(true);
+                }}
+              >
+                <Coffee size={14} />
+                <span>{t.coffeeBtn}</span>
+              </button>
+              <button
+                type="button"
+                className="help-circle-btn"
+                title={t.helpBtn}
+                aria-label={t.helpBtn}
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowInfoModal(true);
+                }}
+              >
+                <HelpCircle size={17} />
+              </button>
+            </div>
           </section>
         )}
 
-        {/* 1) Daily Schedule 탭 (3번째 사진의 색상 선택 스케줄 입력 모달 적용) */}
+        {/* 🔑 Google OAuth Client ID 설정 & 가이드 모달 */}
+        {showGoogleModal && (
+          <div className="modal-backdrop" onClick={() => setShowGoogleModal(false)}>
+            <div className="modal-card google-setup-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>
+                  <Cloud size={17} /> {t.googleModalTitle}
+                </h3>
+                <button className="icon-button" onClick={() => setShowGoogleModal(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="modal-desc">{t.googleModalDesc}</p>
+
+              <div className="google-setup-field">
+                <label>{t.redirectUriLabel}</label>
+                <div className="redirect-copy-row">
+                  <input readOnly value={getRedirectUri()} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(getRedirectUri());
+                      setCopiedRedirect(true);
+                      setTimeout(() => setCopiedRedirect(false), 1800);
+                    }}
+                  >
+                    <Copy size={12} /> {copiedRedirect ? t.copiedText : t.copyText}
+                  </button>
+                </div>
+              </div>
+
+              <div className="google-setup-field">
+                <label>{t.clientIdLabel}</label>
+                <input
+                  className="scm-title-input"
+                  value={clientIdInput}
+                  onChange={(e) => setClientIdInput(e.target.value)}
+                  placeholder={t.clientIdPlaceholder}
+                />
+              </div>
+
+              <div className="google-guide-steps">
+                <div>1. Google Cloud Console → <b>Google Calendar API</b> & <b>Tasks API</b> 사용 설정</div>
+                <div>2. 사용자 인증 정보 → <b>OAuth 클라이언트 ID (웹 애플리케이션)</b> 생성</div>
+                <div>3. 승인된 리디렉션 URI에 위 주소를 붙여넣고 발급된 Client ID 입력</div>
+              </div>
+
+              {syncError && <div className="google-sync-error">{syncError}</div>}
+
+              <div className="google-modal-actions">
+                <button
+                  type="button"
+                  className="scm-cancel-btn"
+                  onClick={() => {
+                    setGoogleClientId(clientIdInput.trim());
+                    setShowGoogleModal(false);
+                  }}
+                >
+                  {t.saveOnlyBtn}
+                </button>
+                <button
+                  type="button"
+                  className="scm-save-btn"
+                  onClick={() => {
+                    const cleanCid = clientIdInput.trim();
+                    setGoogleClientId(cleanCid);
+                    handleGoogleLogin(cleanCid);
+                  }}
+                >
+                  {t.saveAndConnectBtn}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ? 버튼 클릭 시 열리는 라이선스 & GitHub 정보 모달 */}
+        {showInfoModal && (
+          <div className="modal-backdrop" onClick={() => setShowInfoModal(false)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>
+                  <ShieldCheck size={17} /> {t.infoModalTitle}
+                </h3>
+                <button className="icon-button" onClick={() => setShowInfoModal(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="modal-desc">{t.infoDesc}</p>
+              <div className="info-meta-list">
+                <div className="info-meta-row">
+                  <span>{t.versionLabel}</span>
+                  <b>v{APP_META.version}</b>
+                </div>
+                <div className="info-meta-row">
+                  <span>{t.licenseLabel}</span>
+                  <b>{APP_META.license}</b>
+                </div>
+                <div className="info-meta-row">
+                  <span>{t.openSourceLabel}</span>
+                  <b>React 18 · Vite · Lucide Icons</b>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="github-link-btn"
+                onClick={() => openExternalUrl(APP_META.githubUrl)}
+              >
+                <Github size={16} /> {t.githubRepoBtn} <ExternalLink size={13} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ☕ 커피 후원 모달 (Buy Me a Coffee / 카카오페이·토스 안내) */}
+        {showCoffeeModal && (
+          <div className="modal-backdrop" onClick={() => setShowCoffeeModal(false)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>
+                  <Coffee size={17} /> {t.coffeeModalTitle}
+                </h3>
+                <button className="icon-button" onClick={() => setShowCoffeeModal(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="modal-desc">{t.coffeeModalDesc}</p>
+              <button
+                type="button"
+                className="coffee-external-btn"
+                onClick={() => openExternalUrl(APP_META.buyMeACoffeeUrl)}
+              >
+                <Coffee size={16} /> {t.coffeeGlobalBtn} <ExternalLink size={13} />
+              </button>
+              <div className="coffee-qr-box">
+                <strong>{t.coffeeLocalTitle}</strong>
+                <div className="qr-placeholder">QR</div>
+                <small>{APP_META.kakaoPayNote}</small>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 1) Daily Schedule 탭 */}
         {tab === "schedule" && (
           <main className="popup-tab-body">
             <section className="panel timeline-simple-card">
               <div className="timeline-simple-header">
-                <h2 className="timeline-simple-title">오늘의 타임라인</h2>
+                <div className="timeline-title-wrap">
+                  <h2 className="timeline-simple-title">{t.todayTimeline}</h2>
+                  <button
+                    type="button"
+                    className={`weekday-pill-toggle ${weekdayRepeat ? "active" : ""}`}
+                    onClick={() => toggleWeekdayRepeatMode(!weekdayRepeat)}
+                    title={t.weekdayRepeatDesc}
+                  >
+                    <Repeat size={11} />
+                    <span>{t.weekdayRepeatShort} {weekdayRepeat ? "ON" : "OFF"}</span>
+                  </button>
+                </div>
                 <div className="time-range-picker">
                   <select
                     value={startHour}
@@ -546,7 +1563,7 @@ export default function App() {
                       setStartHour(val);
                       if (val >= endHour) setEndHour(Math.min(23, val + 1));
                     }}
-                    aria-label="시작 시간"
+                    aria-label="Start hour"
                   >
                     {Array.from({ length: 24 }, (_, h) => (
                       <option key={h} value={h}>
@@ -561,7 +1578,7 @@ export default function App() {
                       const val = Number(e.target.value);
                       setEndHour(Math.max(startHour, val));
                     }}
-                    aria-label="종료 시간"
+                    aria-label="End hour"
                   >
                     {Array.from({ length: 24 }, (_, h) => (
                       <option key={h} value={h}>
@@ -572,7 +1589,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 2-1) 3번째 사진과 동일한 일정 이름 + 시간 범위 + 7색 파스텔 원형 팔레트 입력 폼 */}
+              {/* 7색 파스텔 원형 팔레트 일정 입력 폼 */}
               {activeSlotHour !== null && (
                 <form className="schedule-color-modal" onSubmit={saveSlotEvent}>
                   <input
@@ -580,7 +1597,7 @@ export default function App() {
                     className="scm-title-input"
                     value={slotTitle}
                     onChange={(e) => setSlotTitle(e.target.value)}
-                    placeholder="일정 이름"
+                    placeholder={t.eventNamePlaceholder}
                   />
                   <div className="scm-time-row">
                     <select
@@ -621,11 +1638,21 @@ export default function App() {
                         className={`scm-color-dot ${slotColor === c.id ? "selected" : ""}`}
                         style={{ backgroundColor: c.hex }}
                         onClick={() => setSlotColor(c.id)}
-                        title={c.label}
-                        aria-label={c.label}
+                        title={language === "English" ? c.labelEn : c.labelKo}
+                        aria-label={language === "English" ? c.labelEn : c.labelKo}
                       />
                     ))}
                   </div>
+
+                  <label className="scm-repeat-check">
+                    <input
+                      type="checkbox"
+                      checked={slotRepeatWeekday}
+                      onChange={(e) => setSlotRepeatWeekday(e.target.checked)}
+                    />
+                    <Repeat size={12} />
+                    <span>{t.weekdayRepeatCheck}</span>
+                  </label>
 
                   <div className="scm-action-row">
                     {editingEventId && (
@@ -633,12 +1660,13 @@ export default function App() {
                         type="button"
                         className="scm-delete-btn"
                         onClick={() => {
-                          setEvents((prev) => prev.filter((x) => x.id !== editingEventId));
+                          const target = events.find((x) => x.id === editingEventId);
+                          deleteDailyEvent(target);
                           setActiveSlotHour(null);
                           setEditingEventId(null);
                         }}
                       >
-                        삭제
+                        {t.delete}
                       </button>
                     )}
                     <button
@@ -649,10 +1677,10 @@ export default function App() {
                         setEditingEventId(null);
                       }}
                     >
-                      취소
+                      {t.cancel}
                     </button>
                     <button type="submit" className="scm-save-btn">
-                      저장
+                      {t.save}
                     </button>
                   </div>
                 </form>
@@ -661,9 +1689,17 @@ export default function App() {
               <div className="timeline-simple-scroll">
                 <div className="timeline-simple-list">
                   {timelineHours.map((h) => {
-                    const ev = events.find((e) => e.start === h);
-                    const isCoveredByPrev = events.some((e) => e.start < h && e.end > h);
+                    // 시작 시각이 정확히 h이거나, 타임라인 첫 줄(startHour)인데 이전 시간부터 이어지는 일정인 경우 표시
+                    const ev = events.find(
+                      (e) =>
+                        e.start === h ||
+                        (h === startHour && e.start < startHour && e.end > startHour)
+                    );
+                    const isCoveredByPrev =
+                      h > startHour && events.some((e) => e.start < h && e.end > h);
                     const colorObj = ev ? COLOR_MAP[ev.color] || COLOR_MAP.sky : null;
+                    const visibleStart = ev ? Math.max(ev.start, startHour) : h;
+                    const visibleEnd = ev ? Math.min(ev.end, endHour + 1) : h + 1;
                     return (
                       <div className="simple-time-row" key={h}>
                         <span className="simple-time-label">
@@ -674,7 +1710,7 @@ export default function App() {
                             <div
                               className="schedule-event"
                               style={{
-                                height: `calc(${Math.max(1, ev.end - ev.start) * 44}px - 5px)`,
+                                height: `calc(${Math.max(1, visibleEnd - visibleStart) * 44}px - 5px)`,
                                 backgroundColor: colorObj.bg,
                                 borderColor: colorObj.border,
                                 color: colorObj.text,
@@ -694,10 +1730,10 @@ export default function App() {
                               </span>
                               <button
                                 className="event-delete"
-                                title="일정 삭제"
+                                title={t.delete}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEvents((prev) => prev.filter((x) => x.id !== ev.id));
+                                  deleteDailyEvent(ev);
                                 }}
                               >
                                 <X size={13} />
@@ -709,7 +1745,7 @@ export default function App() {
                                 type="button"
                                 className="slot-hover-plus"
                                 onClick={() => openSlotForm(h)}
-                                aria-label={`${h}시 일정 추가`}
+                                aria-label={`${h}:00 add`}
                               >
                                 +
                               </button>
@@ -725,14 +1761,14 @@ export default function App() {
           </main>
         )}
 
-        {/* 2) To-Do List 탭: 시간 입력/표시 제거, 할 일 + 태그만 심플하게 입력 */}
+        {/* 2) To-Do List 탭 */}
         {tab === "todo" && (
           <main className="popup-tab-body">
             <section className="panel todo-main">
               <div className="todo-heading">
                 <div>
-                  <h2>할 일 목록</h2>
-                  <p>작은 일부터 하나씩 완료해 보세요.</p>
+                  <h2>{t.todoTitle}</h2>
+                  <p>{t.todoSub}</p>
                 </div>
                 <div className="completion-pill">
                   {doneCount} / {tasks.length}
@@ -746,89 +1782,90 @@ export default function App() {
                 />
               </div>
 
-              {/* 할 일 + 태그 입력 폼 (시간 제거됨) */}
               <form className="add-task-form-tagonly" onSubmit={addTask}>
                 <input
                   className="task-title-input"
                   value={newTask}
                   onChange={(e) => setNewTask(e.target.value)}
-                  placeholder="할 일을 입력하세요..."
+                  placeholder={t.todoPlaceholder}
                 />
                 <select
                   className="task-tag-select"
                   value={newTaskTag}
                   onChange={(e) => setNewTaskTag(e.target.value)}
-                  aria-label="할 일 태그"
+                  aria-label="Tag"
                 >
                   {TAG_LIST.map((tag) => (
                     <option key={tag} value={tag}>
-                      #{tag}
+                      #{getTagLabel(tag, language)}
                     </option>
                   ))}
                 </select>
-                <button type="submit" className="task-submit-btn" aria-label="할 일 추가">
+                <button type="submit" className="task-submit-btn" aria-label="Add task">
                   <Plus size={18} />
                 </button>
               </form>
 
               <div className="filter-row">
-                {["전체", "오늘", "완료"].map((f) => (
+                {[
+                  { key: "ALL", label: t.filterAll },
+                  { key: "ACTIVE", label: t.filterActive },
+                  { key: "DONE", label: t.filterDone },
+                ].map((f) => (
                   <button
-                    key={f}
-                    className={filter === f ? "filter-chip selected" : "filter-chip"}
-                    onClick={() => setFilter(f)}
+                    key={f.key}
+                    className={filter === f.key ? "filter-chip selected" : "filter-chip"}
+                    onClick={() => setFilter(f.key)}
                   >
-                    {f}
+                    {f.label}
                   </button>
                 ))}
               </div>
 
               <div className="task-list">
-                {filteredTasks.map((task) => (
-                  <div className={`task-item ${task.done ? "is-done" : ""}`} key={task.id}>
-                    <button
-                      className={`check-circle ${task.done ? "checked" : ""}`}
-                      onClick={() =>
-                        setTasks((prev) =>
-                          prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t))
-                        )
-                      }
-                    >
-                      {task.done && <Check size={13} />}
-                    </button>
-                    <span className="task-title">{task.title}</span>
-                    <span
-                      className={`tag ${
-                        TAG_CONFIG[task.tag]?.className || "tag-blue"
-                      }`}
-                    >
-                      {task.tag}
-                    </span>
-                    <button
-                      className="delete-task"
-                      onClick={() =>
-                        setTasks((prev) => prev.filter((t) => t.id !== task.id))
-                      }
-                      aria-label="삭제"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
+                {filteredTasks.length === 0 ? (
+                  <div className="empty-state-box">{t.emptyTodoHint}</div>
+                ) : (
+                  filteredTasks.map((task) => (
+                    <div className={`task-item ${task.done ? "is-done" : ""}`} key={task.id}>
+                      <button
+                        className={`check-circle ${task.done ? "checked" : ""}`}
+                        onClick={() => toggleTaskDone(task)}
+                      >
+                        {task.done && <Check size={13} />}
+                      </button>
+                      <span className="task-title">{task.title}</span>
+                      <span
+                        className={`tag ${
+                          TAG_CONFIG[task.tag]?.className || "tag-blue"
+                        }`}
+                      >
+                        {getTagLabel(task.tag, language)}
+                      </span>
+                      <button
+                        className="delete-task"
+                        onClick={() => removeTaskItem(task)}
+                        aria-label={t.delete}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </main>
         )}
 
-        {/* 3) Stopwatch 탭: 2번째 사진과 동일하게 복원 + 하단 오늘의 집중 기록 실시간 누적 */}
+        {/* 3) Stopwatch 탭 */}
         {tab === "timer" && (
           <main className="popup-tab-body timer-scroll-area">
             <section className="panel timer-main">
               <div className="timer-eyebrow">
-                <Timer size={15} /> FOCUS SESSION
+                <Timer size={15} /> {t.focusSession}
               </div>
-              <h2>집중하는 시간</h2>
-              <p className="timer-description">지금 이 순간, 한 가지에 집중해 보세요.</p>
+              <h2>{t.focusTitle}</h2>
+              <p className="timer-description">{t.focusDesc}</p>
 
               <div
                 className="timer-ring"
@@ -837,19 +1874,19 @@ export default function App() {
                 }}
               >
                 <div className="timer-ring-inner">
-                  <span>집중 시간</span>
+                  <span>{t.focusTimeLabel}</span>
                   <strong>{formatTime(remaining)}</strong>
-                  <small>남은 시간</small>
+                  <small>{t.remainingLabel}</small>
                 </div>
               </div>
 
               <div className="timer-actions">
                 <button className="primary-button" onClick={toggleTimer}>
                   {running ? <Pause size={15} /> : <Play size={15} />}{" "}
-                  {running ? "일시정지" : "시작하기"}
+                  {running ? t.pauseBtn : t.startBtn}
                 </button>
                 <button className="secondary-button" onClick={resetTimer}>
-                  <RotateCcw size={15} /> 초기화
+                  <RotateCcw size={15} /> {t.resetBtn}
                 </button>
               </div>
 
@@ -860,23 +1897,23 @@ export default function App() {
                     key={p.m}
                     onClick={() => setPreset(p.m)}
                   >
-                    <b>{p.label}</b>
-                    <small>{p.sub}</small>
+                    <b>{language === "English" ? p.labelEn : p.labelKo}</b>
+                    <small>{language === "English" ? p.subEn : p.subKo}</small>
                   </button>
                 ))}
               </div>
             </section>
 
             <section className="panel timer-history-panel">
-              <h3>오늘의 집중 기록</h3>
+              <h3>{t.todayFocusLog}</h3>
               {todayFocusSessions.length === 0 ? (
                 <div className="focus-stat">
                   <span className="stat-icon">
                     <Clock3 size={15} />
                   </span>
                   <div>
-                    <b>기록을 쌓아보세요</b>
-                    <small>집중 세션이 완료되면 시작 시각과 함께 누적됩니다.</small>
+                    <b>{t.emptyFocusTitle}</b>
+                    <small>{t.emptyFocusDesc}</small>
                   </div>
                 </div>
               ) : (
@@ -886,8 +1923,11 @@ export default function App() {
                       <Clock3 size={15} />
                     </span>
                     <div>
-                      <b>{s.durationMinutes}분</b>
-                      <small>{formatKoreanOrder(idx + 1)}</small>
+                      <b>
+                        {s.durationMinutes}
+                        {t.minuteUnit}
+                      </b>
+                      <small>{formatSessionOrder(idx + 1, language)}</small>
                     </div>
                     <span className="stat-time">{s.timeStr}</span>
                   </div>
@@ -902,17 +1942,11 @@ export default function App() {
 }
 
 /* ==========================================================================
-   [4] 전체 분석 플랫폼 (수정된 기능들에 맞춰 연동된 상세 분석 페이지)
-   - 일주일치 시간표: 3번째 사진과 동일한 7가지 파스텔 색상 선택 및 수정 기능
-   - 할 일 리스트: 시간 없이 할 일 + 태그로만 깔끔하게 관리
-   - 주요 활동 비율: 할 일 목록(To-Do List)의 태그 비율로 자동 계산 및 표시
-   - 스탑워치 집중시간 분석: 태그 입력 없이 실제 시작 시각(timeStr) 및 누적 집중 시간으로 분석
+   [4] 전체 분석 플랫폼 (한국어 / English UI 연동)
    ========================================================================== */
 function AnalyticsPlatform({
   weeklyEvents,
   setWeeklyEvents,
-  weeklyMemo,
-  setWeeklyMemo,
   tasks,
   setTasks,
   focusSessions,
@@ -921,31 +1955,41 @@ function AnalyticsPlatform({
   setDailyGoalHours,
   dark,
   setDark,
-  onBack,
+  language,
+  setLanguage,
+  googleToken,
+  googleUser,
+  isSyncing,
+  onSyncGoogle,
+  onGoogleLogin,
+  onCreateTask,
+  onToggleTask,
+  onDeleteTask,
+  weekdayRepeat,
+  onToggleWeekdayRepeat,
+  weekdayTemplates,
+  setWeekdayTemplates,
 }) {
+  const t = UI_TEXT[language] || UI_TEXT["한국어"];
   const days = [
-    { idx: 0, short: "월", date: 12 },
-    { idx: 1, short: "화", date: 13 },
-    { idx: 2, short: "수", date: 14 },
-    { idx: 3, short: "목", date: 15 },
-    { idx: 4, short: "금", date: 16 },
-    { idx: 5, short: "토", date: 17 },
-    { idx: 6, short: "일", date: 18 },
+    { idx: 0, shortKo: "월", shortEn: "Mon", date: 12 },
+    { idx: 1, shortKo: "화", shortEn: "Tue", date: 13 },
+    { idx: 2, shortKo: "수", shortEn: "Wed", date: 14 },
+    { idx: 3, shortKo: "목", shortEn: "Thu", date: 15 },
+    { idx: 4, shortKo: "금", shortEn: "Fri", date: 16 },
+    { idx: 5, shortKo: "토", shortEn: "Sat", date: 17 },
+    { idx: 6, shortKo: "일", shortEn: "Sun", date: 18 },
   ];
   const gridHours = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
 
   const [subTab, setSubTab] = useState("all");
   const [weekOffset, setWeekOffset] = useState(0);
-  const [editingSlot, setEditingSlot] = useState(null); // { id?, day, start, end, title, color, done }
+  const [editingSlot, setEditingSlot] = useState(null);
 
-  // 할 일 추가 상태 (시간 제거됨)
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskTag, setNewTaskTag] = useState("학습");
-
-  // 수동 집중 시간 기록 추가 상태
   const [manualFocusMin, setManualFocusMin] = useState(25);
 
-  // --- 통계 계산 ---
   const todayIso = getIsoDate(0);
   const totalFocusMin = useMemo(
     () => focusSessions.reduce((acc, s) => acc + s.durationMinutes, 0),
@@ -960,7 +2004,7 @@ function AnalyticsPlatform({
   );
   const weekFocusMin = totalFocusMin;
 
-  const totalDoneTasks = tasks.filter((t) => t.done).length;
+  const totalDoneTasks = tasks.filter((item) => item.done).length;
   const totalPlannedHours = useMemo(
     () => weeklyEvents.reduce((acc, ev) => acc + Math.max(1, ev.end - ev.start), 0),
     [weeklyEvents]
@@ -980,13 +2024,12 @@ function AnalyticsPlatform({
     return Math.round(((scheduleRatio * 0.6 + todoRatio * 0.4) || 0) * 100);
   }, [totalPlannedHours, completedPlannedHours, tasks.length, totalDoneTasks]);
 
-  // 할 일(To-Do List) 중 태그 비율로 주요 활동 비율 계산
   const tagBreakdown = useMemo(() => {
     const counts = {};
-    TAG_LIST.forEach((t) => (counts[t] = 0));
+    TAG_LIST.forEach((tag) => (counts[tag] = 0));
 
-    tasks.forEach((t) => {
-      const key = TAG_CONFIG[t.tag] ? t.tag : "기타";
+    tasks.forEach((item) => {
+      const key = TAG_CONFIG[item.tag] ? item.tag : "기타";
       counts[key] = (counts[key] || 0) + 1;
     });
 
@@ -1001,20 +2044,24 @@ function AnalyticsPlatform({
       .sort((a, b) => b.pct - a.pct);
   }, [tasks]);
 
-  // 최근 10일 스탑워치 집중 타임라인 데이터
   const recentDays = useMemo(() => {
     return Array.from({ length: 10 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const iso = getIsoDate(-i);
       const label =
-        i === 0 ? "오늘" : i === 1 ? "어제" : `${d.getMonth() + 1}월 ${d.getDate()}일`;
+        i === 0
+          ? t.todayLabel
+          : i === 1
+          ? t.yesterdayLabel
+          : language === "English"
+          ? `${d.getMonth() + 1}/${d.getDate()}`
+          : `${d.getMonth() + 1}월 ${d.getDate()}일`;
       const daySessions = focusSessions.filter((s) => s.date === iso);
       return { iso, label, daySessions };
     });
-  }, [focusSessions]);
+  }, [focusSessions, language, t.todayLabel, t.yesterdayLabel]);
 
-  // 월간 목표 집중 시간 달성 통계
   const goalStats = useMemo(() => {
     const mapByDate = {};
     focusSessions.forEach((s) => {
@@ -1027,13 +2074,15 @@ function AnalyticsPlatform({
     return { mapByDate, focusedDaysCount, achievedDaysCount, rate };
   }, [focusSessions, dailyGoalHours]);
 
-  // 주간 시간표 셀 클릭 핸들러 (3번째 사진 색상 팔레트 연동)
   function handleCellClick(dayIdx, hour) {
     const existing = weeklyEvents.find(
       (ev) => ev.day === dayIdx && hour >= ev.start && hour < ev.end
     );
     if (existing) {
-      setEditingSlot({ ...existing });
+      setEditingSlot({
+        ...existing,
+        repeatWeekdays: Boolean(existing.isWeekdayRoutine),
+      });
     } else {
       setEditingSlot({
         id: null,
@@ -1043,56 +2092,150 @@ function AnalyticsPlatform({
         title: "",
         color: "sage",
         done: false,
+        repeatWeekdays: Boolean(weekdayRepeat && dayIdx >= 0 && dayIdx <= 4),
       });
     }
   }
 
-  function saveWeeklySlot(e) {
+  function getWeekDayDateObj(dayIdx) {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const d = new Date(now);
+    d.setDate(now.getDate() + diffToMon + dayIdx + weekOffset * 7);
+    return d;
+  }
+
+  async function saveWeeklySlot(e) {
     e.preventDefault();
     if (!editingSlot || !editingSlot.title.trim()) return;
     const start = Number(editingSlot.start);
     const end = Math.max(start + 1, Number(editingSlot.end));
+    const cleanTitle = editingSlot.title.trim();
+    const repeatAllWeekdays = Boolean(editingSlot.repeatWeekdays);
+    const slotCopy = {
+      ...editingSlot,
+      start,
+      end,
+      title: cleanTitle,
+      isWeekdayRoutine: repeatAllWeekdays,
+    };
+    setEditingSlot(null);
 
-    if (editingSlot.id) {
-      setWeeklyEvents((prev) =>
-        prev.map((ev) =>
-          ev.id === editingSlot.id
-            ? { ...editingSlot, start, end, title: editingSlot.title.trim() }
-            : ev
-        )
-      );
-    } else {
-      setWeeklyEvents((prev) => [
-        ...prev,
-        {
-          ...editingSlot,
-          id: Date.now(),
+    // "평일(월~금) 매일 반복 루틴으로 등록" 체크 시 월(0)~금(4) 전체에 즉시 복제 + 루틴 템플릿 등록
+    if (repeatAllWeekdays) {
+      const tplItem = {
+        id: `tpl-${start}-${Date.now()}`,
+        title: cleanTitle,
+        start,
+        end,
+        color: slotCopy.color,
+      };
+      if (setWeekdayTemplates) {
+        setWeekdayTemplates((prev) => [
+          ...prev.filter((tItem) => tItem.start !== start),
+          tplItem,
+        ]);
+      }
+      if (onToggleWeekdayRepeat && !weekdayRepeat) {
+        onToggleWeekdayRepeat(true);
+      }
+      setWeeklyEvents((prev) => {
+        const filtered = prev.filter(
+          (ev) => !(ev.day >= 0 && ev.day <= 4 && ev.start === start)
+        );
+        const added = [0, 1, 2, 3, 4].map((d) => ({
+          id: `routine-w-${d}-${start}-${Date.now()}`,
+          routineId: tplItem.id,
+          isWeekdayRoutine: true,
+          day: d,
           start,
           end,
-          title: editingSlot.title.trim(),
-        },
-      ]);
+          title: cleanTitle,
+          color: slotCopy.color,
+          done: d === slotCopy.day ? Boolean(slotCopy.done) : false,
+        }));
+        return [...filtered, ...added];
+      });
+      return;
     }
-    setEditingSlot(null);
+
+    if (slotCopy.id) {
+      setWeeklyEvents((prev) =>
+        prev.map((ev) => (ev.id === slotCopy.id ? slotCopy : ev))
+      );
+      if (googleToken && slotCopy.googleEventId) {
+        try {
+          await updateGoogleCalendarEvent(googleToken, slotCopy.googleEventId, {
+            title: cleanTitle,
+            start,
+            end,
+            color: slotCopy.color,
+            dateObj: getWeekDayDateObj(slotCopy.day),
+          });
+        } catch (err) {
+          console.warn("Google Calendar 주간 일정 수정 실패:", err);
+        }
+      }
+    } else {
+      const tempId = Date.now();
+      const newEv = {
+        ...slotCopy,
+        id: tempId,
+      };
+      setWeeklyEvents((prev) => [...prev, newEv]);
+      if (googleToken) {
+        try {
+          const created = await createGoogleCalendarEvent(googleToken, {
+            title: cleanTitle,
+            start,
+            end,
+            color: slotCopy.color,
+            dateObj: getWeekDayDateObj(slotCopy.day),
+          });
+          if (created?.id) {
+            setWeeklyEvents((prev) =>
+              prev.map((ev) =>
+                ev.id === tempId ? { ...ev, googleEventId: created.id } : ev
+              )
+            );
+          }
+        } catch (err) {
+          console.warn("Google Calendar 주간 일정 생성 실패:", err);
+        }
+      }
+    }
   }
 
-  function deleteWeeklySlot(id) {
+  async function deleteWeeklySlot(id) {
+    const target = weeklyEvents.find((ev) => ev.id === id);
     setWeeklyEvents((prev) => prev.filter((ev) => ev.id !== id));
     setEditingSlot(null);
+    if (googleToken && target?.googleEventId) {
+      try {
+        await deleteGoogleCalendarEvent(googleToken, target.googleEventId);
+      } catch (err) {
+        console.warn("Google Calendar 주간 일정 삭제 실패:", err);
+      }
+    }
   }
 
   function addTaskFromPlatform(e) {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
-    setTasks((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        title: newTaskTitle.trim(),
-        tag: newTaskTag,
-        done: false,
-      },
-    ]);
+    if (onCreateTask) {
+      onCreateTask(newTaskTitle, newTaskTag);
+    } else {
+      setTasks((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          title: newTaskTitle.trim(),
+          tag: newTaskTag,
+          done: false,
+        },
+      ]);
+    }
     setNewTaskTitle("");
   }
 
@@ -1109,7 +2252,7 @@ function AnalyticsPlatform({
           date: todayKey,
           startHour: now.getHours(),
           durationMinutes: Number(manualFocusMin) || 25,
-          label: formatKoreanOrder(todayCount + 1),
+          order: todayCount + 1,
           timeStr,
         },
         ...prev,
@@ -1128,7 +2271,7 @@ function AnalyticsPlatform({
             <div className="brand-name">
               My Plan <Sparkles size={14} />
             </div>
-            <div className="brand-subtitle">오늘도, 조금 더 나은 하루를 위해 · 통합 분석 리포트</div>
+            <div className="brand-subtitle">{t.platformSub}</div>
           </div>
         </div>
 
@@ -1137,33 +2280,55 @@ function AnalyticsPlatform({
             className={subTab === "all" ? "p-tab active" : "p-tab"}
             onClick={() => setSubTab("all")}
           >
-            <BarChart3 size={15} /> 전체 분석 플랫폼
+            <BarChart3 size={15} /> {t.navAll}
           </button>
           <button
             className={subTab === "weekly" ? "p-tab active" : "p-tab"}
             onClick={() => setSubTab("weekly")}
           >
-            <CalendarDays size={15} /> 주간 시간표 & 할 일
+            <CalendarDays size={15} /> {t.navWeekly}
           </button>
           <button
             className={subTab === "focus" ? "p-tab active" : "p-tab"}
             onClick={() => setSubTab("focus")}
           >
-            <Timer size={15} /> 스탑워치 집중 분석
+            <Timer size={15} /> {t.navFocus}
           </button>
         </div>
 
         <div className="platform-actions">
+          {googleToken ? (
+            <button
+              className="theme-toggle-btn google-header-pill"
+              disabled={isSyncing}
+              onClick={onSyncGoogle}
+              title={googleUser?.email || "Google Sync"}
+            >
+              <RotateCw size={14} className={isSyncing ? "spin-icon" : ""} />
+              <span>{isSyncing ? t.googleSyncing : `Google ${t.googleSyncNow}`}</span>
+            </button>
+          ) : (
+            <button
+              className="theme-toggle-btn google-header-pill"
+              onClick={onGoogleLogin}
+            >
+              <Cloud size={15} />
+              <span>Google {t.googleSyncNow}</span>
+            </button>
+          )}
+          <button
+            className="theme-toggle-btn"
+            onClick={() => setLanguage((l) => (l === "한국어" ? "English" : "한국어"))}
+          >
+            <Languages size={15} />
+            <span>{language === "한국어" ? "EN" : "한국어"}</span>
+          </button>
           <button
             className="theme-toggle-btn"
             onClick={() => setDark((v) => !v)}
-            title="라이트 / 다크 테마 전환"
           >
             {dark ? <Sun size={16} /> : <Moon size={16} />}
-            <span>{dark ? "파스텔 라이트" : "다크 리포트"}</span>
-          </button>
-          <button className="back-popup-btn" onClick={onBack}>
-            <X size={18} /> 팝업으로 돌아가기
+            <span>{dark ? t.pastelLight : t.darkReport}</span>
           </button>
         </div>
       </header>
@@ -1172,40 +2337,40 @@ function AnalyticsPlatform({
       <section className="kpi-six-grid">
         <div className="kpi-card">
           <span className="kpi-label">
-            <i className="dot-red" /> 스탑워치 총 집중시간
+            <i className="dot-red" /> {t.kpiTotalFocus}
           </span>
           <strong className="kpi-value red">
             {totalFocusMin}
-            <small>분</small>
+            <small>{t.minuteUnit}</small>
           </strong>
         </div>
         <div className="kpi-card">
           <span className="kpi-label">
-            <i className="dot-red" /> 이번 주 집중시간
+            <i className="dot-red" /> {t.kpiWeekFocus}
           </span>
           <strong className="kpi-value red">
             {weekFocusMin}
-            <small>분</small>
+            <small>{t.minuteUnit}</small>
           </strong>
         </div>
         <div className="kpi-card">
           <span className="kpi-label">
-            <i className="dot-red" /> 오늘 집중시간
+            <i className="dot-red" /> {t.kpiTodayFocus}
           </span>
           <strong className="kpi-value red">
             {todayFocusMin}
-            <small>분</small>
+            <small>{t.minuteUnit}</small>
           </strong>
         </div>
         <div className="kpi-card">
           <span className="kpi-label">
-            <i className="dot-blue" /> 총 완료된 할 일
+            <i className="dot-blue" /> {t.kpiDoneTasks}
           </span>
           <strong className="kpi-value blue">{totalDoneTasks}</strong>
         </div>
         <div className="kpi-card">
           <span className="kpi-label">
-            <i className="dot-blue" /> 주간 완료 일정
+            <i className="dot-blue" /> {t.kpiDoneBlocks}
           </span>
           <strong className="kpi-value blue">
             {weeklyEvents.filter((e) => e.done).length}
@@ -1213,7 +2378,7 @@ function AnalyticsPlatform({
         </div>
         <div className="kpi-card">
           <span className="kpi-label">
-            <i className="dot-blue" /> 종합 달성률
+            <i className="dot-blue" /> {t.kpiAchievement}
           </span>
           <strong className="kpi-value blue">
             {achievementRate}
@@ -1229,31 +2394,44 @@ function AnalyticsPlatform({
             <div className="panel weekly-schedule-card">
               <div className="weekly-card-header">
                 <div>
-                  <h2>주간 계획표 (클릭하여 색상별 일정 추가/수정)</h2>
-                  <p className="sub-hint">
-                    시간표의 칸을 클릭해 7가지 파스텔 색상으로 일정을 등록하거나 완료 체크하세요.
-                  </p>
+                  <h2>{t.weeklyScheduleTitle}</h2>
+                  <p className="sub-hint">{t.weeklyScheduleSub}</p>
                 </div>
-                <div className="week-range-controls">
+                <div className="weekly-header-right">
                   <button
-                    className="icon-button"
-                    onClick={() => setWeekOffset((w) => w - 1)}
+                    type="button"
+                    className={`weekday-pill-toggle large ${weekdayRepeat ? "active" : ""}`}
+                    onClick={() =>
+                      onToggleWeekdayRepeat && onToggleWeekdayRepeat(!weekdayRepeat)
+                    }
+                    title={t.weekdayRepeatDesc}
                   >
-                    <ChevronLeft size={16} />
+                    <Repeat size={13} />
+                    <span>
+                      {t.weekdayRepeatTitle} : {weekdayRepeat ? "ON" : "OFF"}
+                    </span>
                   </button>
-                  <span className="week-date-badge">
-                    2026. 10. {12 + weekOffset * 7} (월) - 10. {18 + weekOffset * 7} (일)
-                  </span>
-                  <button
-                    className="icon-button"
-                    onClick={() => setWeekOffset((w) => w + 1)}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
+                  <div className="week-range-controls">
+                    <button
+                      className="icon-button"
+                      onClick={() => setWeekOffset((w) => w - 1)}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="week-date-badge">
+                      2026. 10. {12 + weekOffset * 7} ({language === "English" ? "Mon" : "월"}) - 10.{" "}
+                      {18 + weekOffset * 7} ({language === "English" ? "Sun" : "일"})
+                    </span>
+                    <button
+                      className="icon-button"
+                      onClick={() => setWeekOffset((w) => w + 1)}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* 주간 일정 편집 모달 (3번째 사진과 동일한 7색 원형 팔레트 적용) */}
               {editingSlot && (
                 <form className="schedule-color-modal weekly-modal-override" onSubmit={saveWeeklySlot}>
                   <input
@@ -1263,7 +2441,7 @@ function AnalyticsPlatform({
                     onChange={(e) =>
                       setEditingSlot({ ...editingSlot, title: e.target.value })
                     }
-                    placeholder="일정 이름"
+                    placeholder={t.eventNamePlaceholder}
                   />
                   <div className="scm-time-row weekly-time-row">
                     <select
@@ -1274,7 +2452,7 @@ function AnalyticsPlatform({
                     >
                       {days.map((d) => (
                         <option key={d.idx} value={d.idx}>
-                          {d.short}요일
+                          {language === "English" ? d.shortEn : `${d.shortKo}요일`}
                         </option>
                       ))}
                     </select>
@@ -1323,7 +2501,7 @@ function AnalyticsPlatform({
                           onClick={() =>
                             setEditingSlot({ ...editingSlot, color: c.id })
                           }
-                          title={c.label}
+                          title={language === "English" ? c.labelEn : c.labelKo}
                         />
                       ))}
                       <label className="scm-done-check">
@@ -1334,7 +2512,20 @@ function AnalyticsPlatform({
                             setEditingSlot({ ...editingSlot, done: e.target.checked })
                           }
                         />
-                        완료됨
+                        {t.completedCheck}
+                      </label>
+                      <label className="scm-done-check">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editingSlot.repeatWeekdays)}
+                          onChange={(e) =>
+                            setEditingSlot({
+                              ...editingSlot,
+                              repeatWeekdays: e.target.checked,
+                            })
+                          }
+                        />
+                        <Repeat size={12} /> {t.weekdayRepeatCheck}
                       </label>
                     </div>
 
@@ -1345,7 +2536,7 @@ function AnalyticsPlatform({
                           className="scm-delete-btn"
                           onClick={() => deleteWeeklySlot(editingSlot.id)}
                         >
-                          <Trash2 size={13} /> 삭제
+                          <Trash2 size={13} /> {t.delete}
                         </button>
                       )}
                       <button
@@ -1353,26 +2544,25 @@ function AnalyticsPlatform({
                         className="scm-cancel-btn"
                         onClick={() => setEditingSlot(null)}
                       >
-                        취소
+                        {t.cancel}
                       </button>
                       <button type="submit" className="scm-save-btn">
-                        저장
+                        {t.save}
                       </button>
                     </div>
                   </div>
                 </form>
               )}
 
-              {/* 일주일 시간표 그리드 */}
               <div className="weekly-timetable-wrapper">
                 <div className="weekly-timetable">
-                  <div className="wt-corner">시간</div>
+                  <div className="wt-corner">{t.timeCol}</div>
                   {days.map((d) => (
                     <div
                       key={d.idx}
                       className={`wt-day-header ${d.idx === 5 ? "today-col" : ""}`}
                     >
-                      {d.short} ({d.date + weekOffset * 7})
+                      {language === "English" ? d.shortEn : d.shortKo} ({d.date + weekOffset * 7})
                     </div>
                   ))}
 
@@ -1435,26 +2625,11 @@ function AnalyticsPlatform({
                 </div>
               </div>
             </div>
-
-            <div className="panel weekly-memo-card">
-              <div className="panel-title-row">
-                <h3>
-                  <NotebookPen size={16} /> 주간 메모
-                </h3>
-                <Pencil size={14} />
-              </div>
-              <textarea
-                value={weeklyMemo}
-                onChange={(e) => setWeeklyMemo(e.target.value)}
-                placeholder="이번 주 회고와 다음 주 목표를 자유롭게 적어보세요..."
-              />
-            </div>
           </div>
 
           <div className="platform-right-col">
-            {/* 주간 통계 / 성과율 */}
             <div className="panel weekly-stats-card">
-              <h2>주간 통계 · 성과율</h2>
+              <h2>{t.weeklyStatsTitle}</h2>
               <div className="stats-donut-row">
                 <div
                   className="donut-chart"
@@ -1467,123 +2642,140 @@ function AnalyticsPlatform({
                   </div>
                 </div>
                 <div className="donut-caption">
-                  <h4>계획 대비 완료율</h4>
-                  <p>
-                    주간 시간표 완료 블록(60%)과 할 일 달성률(40%)을 합산한 종합 성과 지표입니다.
-                  </p>
+                  <h4>{t.completionRateTitle}</h4>
+                  <p>{t.completionRateDesc}</p>
                 </div>
               </div>
 
               <div className="stats-three-boxes">
                 <div className="stat-mini-box">
-                  <small>총 계획 시간</small>
-                  <b>{totalPlannedHours}시간</b>
+                  <small>{t.totalPlanned}</small>
+                  <b>
+                    {totalPlannedHours}
+                    {t.hourUnit}
+                  </b>
                 </div>
                 <div className="stat-mini-box">
-                  <small>실제 진행 시간</small>
-                  <b>{completedPlannedHours}시간</b>
+                  <small>{t.actualProgress}</small>
+                  <b>
+                    {completedPlannedHours}
+                    {t.hourUnit}
+                  </b>
                 </div>
                 <div className="stat-mini-box highlight">
-                  <small>미완료 시간</small>
-                  <b>{remainingPlannedHours}시간</b>
+                  <small>{t.remainingTime}</small>
+                  <b>
+                    {remainingPlannedHours}
+                    {t.hourUnit}
+                  </b>
                 </div>
               </div>
             </div>
 
-            {/* 주요 활동 비율 - 할 일 중 태그 비율로 구분 */}
             <div className="panel tag-ratio-card">
               <div className="panel-title-row">
-                <h2>주요 항목 비율 (할 일 태그 기준)</h2>
-                <span className="badge-subtle">총 {tasks.length}개 할 일</span>
+                <h2>{t.tagRatioTitle}</h2>
+                <span className="badge-subtle">{t.totalTasksCount(tasks.length)}</span>
               </div>
               <div className="tag-ratio-list">
-                {tagBreakdown.map((item) => (
-                  <div className="tag-ratio-row" key={item.tag}>
-                    <div className="tag-ratio-name">
-                      <span
-                        className="tag-dot"
-                        style={{ backgroundColor: item.hex }}
-                      />
-                      <b>{item.tag}</b>
+                {tagBreakdown.length === 0 ? (
+                  <div className="empty-state-box">{t.emptyTagRatio}</div>
+                ) : (
+                  tagBreakdown.map((item) => (
+                    <div className="tag-ratio-row" key={item.tag}>
+                      <div className="tag-ratio-name">
+                        <span
+                          className="tag-dot"
+                          style={{ backgroundColor: item.hex }}
+                        />
+                        <b>{getTagLabel(item.tag, language)}</b>
+                      </div>
+                      <div className="tag-ratio-bar-track">
+                        <div
+                          className="tag-ratio-bar-fill"
+                          style={{
+                            width: `${item.pct}%`,
+                            backgroundColor: item.hex,
+                          }}
+                        />
+                      </div>
+                      <strong className="tag-ratio-pct">{item.pct}%</strong>
                     </div>
-                    <div className="tag-ratio-bar-track">
-                      <div
-                        className="tag-ratio-bar-fill"
-                        style={{
-                          width: `${item.pct}%`,
-                          backgroundColor: item.hex,
-                        }}
-                      />
-                    </div>
-                    <strong className="tag-ratio-pct">{item.pct}%</strong>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
-            {/* 할 일 리스트 관리 카드 (시간 제거됨) */}
             <div className="panel platform-todo-card">
               <div className="panel-title-row">
                 <h2>
-                  <ListTodo size={17} /> 할 일 리스트 ({totalDoneTasks}/{tasks.length})
+                  <ListTodo size={17} /> {t.todoListCardTitle} ({totalDoneTasks}/{tasks.length})
                 </h2>
               </div>
               <form className="platform-todo-form-tagonly" onSubmit={addTaskFromPlatform}>
                 <input
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
-                  placeholder="새 할 일 입력..."
+                  placeholder={t.newTaskPlaceholder}
                 />
                 <select
                   value={newTaskTag}
                   onChange={(e) => setNewTaskTag(e.target.value)}
                 >
-                  {TAG_LIST.map((t) => (
-                    <option key={t} value={t}>
-                      #{t}
+                  {TAG_LIST.map((tag) => (
+                    <option key={tag} value={tag}>
+                      #{getTagLabel(tag, language)}
                     </option>
                   ))}
                 </select>
-                <button type="submit" aria-label="할 일 추가">
+                <button type="submit" aria-label="Add task">
                   <Plus size={16} />
                 </button>
               </form>
               <div className="platform-todo-list">
-                {tasks.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`task-item ${t.done ? "is-done" : ""}`}
-                  >
-                    <button
-                      className={`check-circle ${t.done ? "checked" : ""}`}
-                      onClick={() =>
-                        setTasks((prev) =>
-                          prev.map((x) =>
-                            x.id === t.id ? { ...x, done: !x.done } : x
-                          )
-                        )
-                      }
+                {tasks.length === 0 ? (
+                  <div className="empty-state-box">{t.emptyTodoHint}</div>
+                ) : (
+                  tasks.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`task-item ${item.done ? "is-done" : ""}`}
                     >
-                      {t.done && <Check size={12} />}
-                    </button>
-                    <span className="task-title">{t.title}</span>
-                    <span
-                      className={`tag ${
-                        TAG_CONFIG[t.tag]?.className || "tag-blue"
-                      }`}
-                    >
-                      {t.tag}
-                    </span>
-                    <button
-                      className="delete-task"
-                      onClick={() =>
-                        setTasks((prev) => prev.filter((x) => x.id !== t.id))
-                      }
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                ))}
+                      <button
+                        className={`check-circle ${item.done ? "checked" : ""}`}
+                        onClick={() =>
+                          onToggleTask
+                            ? onToggleTask(item)
+                            : setTasks((prev) =>
+                                prev.map((x) =>
+                                  x.id === item.id ? { ...x, done: !x.done } : x
+                                )
+                              )
+                        }
+                      >
+                        {item.done && <Check size={12} />}
+                      </button>
+                      <span className="task-title">{item.title}</span>
+                      <span
+                        className={`tag ${
+                          TAG_CONFIG[item.tag]?.className || "tag-blue"
+                        }`}
+                      >
+                        {getTagLabel(item.tag, language)}
+                      </span>
+                      <button
+                        className="delete-task"
+                        onClick={() =>
+                          onDeleteTask
+                            ? onDeleteTask(item)
+                            : setTasks((prev) => prev.filter((x) => x.id !== item.id))
+                        }
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -1596,29 +2788,31 @@ function AnalyticsPlatform({
           <div className="panel focus-heatmap-card">
             <div className="panel-title-row">
               <div>
-                <h2>스탑워치 · 공부 집중시간 기록</h2>
-                <p className="sub-hint">
-                  최근 10일간 실제 시작한 시각 기준의 공부 집중 세션 분포입니다.
-                </p>
+                <h2>{t.focusRecordTitle}</h2>
+                <p className="sub-hint">{t.focusRecordSub}</p>
               </div>
               <form className="quick-focus-add" onSubmit={addManualFocusSession}>
                 <select
                   value={manualFocusMin}
                   onChange={(e) => setManualFocusMin(Number(e.target.value))}
                 >
-                  <option value={25}>25분 (뽀모도로)</option>
-                  <option value={50}>50분 (긴 집중)</option>
-                  <option value={60}>60분 (1시간 몰입)</option>
+                  {PRESET_LIST.map((p) => (
+                    <option key={p.m} value={p.m}>
+                      {language === "English"
+                        ? `${p.labelEn} (${p.subEn})`
+                        : `${p.labelKo} (${p.subKo})`}
+                    </option>
+                  ))}
                 </select>
                 <button type="submit" className="slot-save-btn">
-                  + 현재 시각으로 집중 기록 추가
+                  {t.addCurrentFocusBtn}
                 </button>
               </form>
             </div>
 
             <div className="heatmap-table">
               <div className="heatmap-header-row">
-                <span className="hm-day-col">날짜</span>
+                <span className="hm-day-col">{t.dateCol}</span>
                 {[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22].map((h) => (
                   <span key={h} className="hm-hour-col">
                     {h}:00
@@ -1629,7 +2823,7 @@ function AnalyticsPlatform({
                 <div className="heatmap-body-row" key={row.iso}>
                   <span className="hm-day-label">{row.label}</span>
                   <div className="hm-timeline-track">
-                    {row.daySessions.map((s) => {
+                    {row.daySessions.map((s, idx) => {
                       const leftPct = Math.min(95, Math.max(0, (s.startHour / 24) * 100));
                       const widthPct = Math.max(4, (s.durationMinutes / (24 * 60)) * 100 * 1.8);
                       return (
@@ -1641,7 +2835,10 @@ function AnalyticsPlatform({
                             width: `${widthPct}%`,
                             backgroundColor: "#5a9cf8",
                           }}
-                          title={`${s.timeStr} 시작 · ${s.durationMinutes}분 집중 (${s.label})`}
+                          title={`${s.timeStr} · ${s.durationMinutes}${t.minuteUnit} (${formatSessionOrder(
+                            s.order || idx + 1,
+                            language
+                          )})`}
                         />
                       );
                     })}
@@ -1654,14 +2851,17 @@ function AnalyticsPlatform({
           <div className="panel focus-goal-card">
             <div className="panel-title-row">
               <div>
-                <h2>목표 집중 시간 달성</h2>
+                <h2>{t.goalCardTitle}</h2>
                 <p className="sub-hint">
-                  집중한 날: {goalStats.focusedDaysCount}일 · 달성 일수:{" "}
-                  {goalStats.achievedDaysCount}일 · 달성률: {goalStats.rate}%
+                  {t.goalCardSub(
+                    goalStats.focusedDaysCount,
+                    goalStats.achievedDaysCount,
+                    goalStats.rate
+                  )}
                 </p>
               </div>
               <label className="goal-target-badge">
-                <Target size={14} /> 목표:
+                <Target size={14} /> {t.goalBadge}
                 <select
                   value={dailyGoalHours}
                   onChange={(e) => setDailyGoalHours(Number(e.target.value))}
@@ -1677,10 +2877,13 @@ function AnalyticsPlatform({
 
             <div className="goal-calendar">
               <div className="goal-cal-header">
-                <strong>2026년 10월</strong>
+                <strong>{language === "English" ? "October 2026" : "2026년 10월"}</strong>
               </div>
               <div className="goal-cal-weekdays">
-                {["월", "화", "수", "목", "금", "토", "일"].map((w) => (
+                {(language === "English"
+                  ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                  : ["월", "화", "수", "목", "금", "토", "일"]
+                ).map((w) => (
                   <span key={w}>{w}</span>
                 ))}
               </div>
@@ -1698,11 +2901,6 @@ function AnalyticsPlatform({
                       className={`goal-cal-day ${
                         achieved ? "achieved" : hasFocus ? "partial" : ""
                       } ${isToday ? "today" : ""}`}
-                      title={
-                        minFocused
-                          ? `${dayNum}일: ${minFocused}분 집중`
-                          : `${dayNum}일: 기록 없음`
-                      }
                     >
                       <span>{dayNum}</span>
                       {minFocused > 0 && <small>{minFocused}m</small>}
@@ -1714,13 +2912,20 @@ function AnalyticsPlatform({
 
             <div className="recent-focus-log">
               <h4>
-                <Flame size={14} /> 최근 스탑워치 집중 로그
+                <Flame size={14} /> {t.recentFocusLogTitle}
               </h4>
-              {focusSessions.slice(0, 5).map((s) => (
+              {focusSessions.slice(0, 5).map((s, idx) => (
                 <div className="focus-log-item" key={s.id}>
-                  <span className="tag tag-blue">{s.timeStr} 시작</span>
-                  <span className="focus-log-title">{s.label}</span>
-                  <b>{s.durationMinutes}분</b>
+                  <span className="tag tag-blue">
+                    {s.timeStr} {t.startedAt}
+                  </span>
+                  <span className="focus-log-title">
+                    {formatSessionOrder(s.order || idx + 1, language)}
+                  </span>
+                  <b>
+                    {s.durationMinutes}
+                    {t.minuteUnit}
+                  </b>
                   <small>{s.date.slice(5)}</small>
                   <button
                     className="icon-button"
