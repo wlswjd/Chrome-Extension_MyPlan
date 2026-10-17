@@ -228,6 +228,8 @@ const UI_TEXT = {
     weekdayRepeatShort: "평일 반복",
     saveAsWeekdayRoutine: "오늘 일정을 평일 루틴으로 저장",
     routineSavedToast: "평일 루틴이 적용되었습니다!",
+    weekendRepeatBlockedToast:
+      "평일(월~금)에만 적용할 수 있습니다. 주말(토·일)에는 적용되지 않아요!",
   },
   English: {
     settings: "Quick Settings",
@@ -345,6 +347,8 @@ const UI_TEXT = {
     weekdayRepeatShort: "Weekday Repeat",
     saveAsWeekdayRoutine: "Save Today as Weekday Routine",
     routineSavedToast: "Weekday routine applied!",
+    weekendRepeatBlockedToast:
+      "Weekday routine can only be applied on weekdays (Mon–Fri)!",
   },
 };
 
@@ -461,6 +465,23 @@ export default function App() {
   const [weekdayTemplates, setWeekdayTemplates] = useState(() =>
     loadLocal("myplan-weekday-templates", [])
   );
+  const [toastMsg, setToastMsg] = useState("");
+  const toastTimerRef = useRef(null);
+
+  function showToast(message) {
+    setToastMsg(message);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMsg("");
+    }, 2600);
+  }
+
+  function isTodayWeekend() {
+    const jsDay = new Date().getDay();
+    return jsDay === 0 || jsDay === 6;
+  }
 
   const [showSettings, setShowSettings] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -632,9 +653,9 @@ export default function App() {
   /* ==========================================================================
      [Google OAuth 로그인 & Google Calendar / Tasks 양방향 동기화 핸들러]
      ========================================================================== */
-  async function syncAllWithGoogle(tokenToUse = googleToken) {
+  async function syncAllWithGoogle(tokenToUse = googleToken, silent = false) {
     if (!tokenToUse) return;
-    setIsSyncing(true);
+    if (!silent) setIsSyncing(true);
     setSyncError("");
     try {
       // 1) 프로필 확인
@@ -653,12 +674,50 @@ export default function App() {
 
       setEvents((prev) => {
         const localOnly = prev.filter((ev) => !ev.googleEventId);
-        return [...localOnly, ...gDaily];
+        const merged = [...localOnly, ...gDaily];
+        // 평일 반복이 켜져 있고 오늘이 평일(월~금)이면 루틴 템플릿 중 비어있는 시간대 유지
+        const jsDay = new Date().getDay();
+        if (weekdayRepeat && jsDay >= 1 && jsDay <= 5 && weekdayTemplates.length > 0) {
+          weekdayTemplates.forEach((tpl) => {
+            if (!merged.some((ev) => ev.start === tpl.start)) {
+              merged.push({
+                id: `routine-d-${tpl.start}`,
+                routineId: tpl.id,
+                isWeekdayRoutine: true,
+                title: tpl.title,
+                start: tpl.start,
+                end: tpl.end,
+                color: tpl.color || "sky",
+              });
+            }
+          });
+        }
+        return merged;
       });
 
       setWeeklyEvents((prev) => {
         const localOnly = prev.filter((ev) => !ev.googleEventId);
-        return [...localOnly, ...gWeekly];
+        const merged = [...localOnly, ...gWeekly];
+        if (weekdayRepeat && weekdayTemplates.length > 0) {
+          for (let d = 0; d <= 4; d++) {
+            weekdayTemplates.forEach((tpl) => {
+              if (!merged.some((ev) => ev.day === d && ev.start === tpl.start)) {
+                merged.push({
+                  id: `routine-w-${d}-${tpl.start}`,
+                  routineId: tpl.id,
+                  isWeekdayRoutine: true,
+                  day: d,
+                  start: tpl.start,
+                  end: tpl.end,
+                  title: tpl.title,
+                  color: tpl.color || "sky",
+                  done: false,
+                });
+              }
+            });
+          }
+        }
+        return merged;
       });
 
       // 3) 구글 Tasks 할 일 불러오기
@@ -683,13 +742,40 @@ export default function App() {
             ? "Session expired. Please sign in again."
             : "구글 인증이 만료되었습니다. 다시 로그인해 주세요."
         );
-      } else {
+      } else if (!silent) {
         setSyncError(err?.message || "Sync failed");
       }
     } finally {
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
     }
   }
+
+  // 구글 로그인 상태일 때:
+  // 1) 팝업/창을 열자마자 즉시 동기화
+  // 2) 구글 캘린더/할일 탭에서 수정·삭제 후 다시 확장프로그램 창을 클릭(focus)할 때 즉시 자동 동기화
+  // 3) 창을 띄워둔 상태에서도 20초마다 백그라운드 자동 동기화 (API 할당량 초과 없이 실시간 반영)
+  useEffect(() => {
+    if (!googleToken) return;
+    syncAllWithGoogle(googleToken, true);
+
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === "visible") {
+        syncAllWithGoogle(googleToken, true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocusOrVisible);
+    document.addEventListener("visibilitychange", handleFocusOrVisible);
+    const intervalId = window.setInterval(() => {
+      syncAllWithGoogle(googleToken, true);
+    }, 20000);
+
+    return () => {
+      window.removeEventListener("focus", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleFocusOrVisible);
+      window.clearInterval(intervalId);
+    };
+  }, [googleToken]);
 
   async function handleGoogleLogin(overrideClientId) {
     setSyncError("");
@@ -758,38 +844,48 @@ export default function App() {
       return next;
     });
 
-    // 2) 오늘의 타임라인에도 자동 반영 (오늘이 평일이거나 사용자가 즉시 확인하고 싶을 때)
-    setEvents((prev) => {
-      const next = [...prev];
-      templatesToApply.forEach((tpl) => {
-        const exists = next.some((ev) => ev.start === tpl.start);
-        if (!exists) {
-          next.push({
-            id: `routine-d-${tpl.start}-${Date.now()}`,
-            routineId: tpl.id,
-            isWeekdayRoutine: true,
-            title: tpl.title,
-            start: tpl.start,
-            end: tpl.end,
-            color: tpl.color || "sky",
-          });
-        }
+    // 2) 오늘의 타임라인에도 자동 반영 (단, 오늘이 평일 월~금일 때만 반영하고 토/일 주말에는 절대 넣지 않음)
+    if (!isTodayWeekend()) {
+      setEvents((prev) => {
+        const next = [...prev];
+        templatesToApply.forEach((tpl) => {
+          const exists = next.some((ev) => ev.start === tpl.start);
+          if (!exists) {
+            next.push({
+              id: `routine-d-${tpl.start}-${Date.now()}`,
+              routineId: tpl.id,
+              isWeekdayRoutine: true,
+              title: tpl.title,
+              start: tpl.start,
+              end: tpl.end,
+              color: tpl.color || "sky",
+            });
+          }
+        });
+        return next;
       });
-      return next;
-    });
+    }
   }
 
   function toggleWeekdayRepeatMode(nextValue) {
     const targetState =
       typeof nextValue === "boolean" ? nextValue : !weekdayRepeat;
+
+    // 토/일 주말에는 평일 반복 ON을 눌러도 적용되지 않고 안내 토스트 표시
+    if (targetState && isTodayWeekend()) {
+      setWeekdayRepeat(false);
+      showToast(t.weekendRepeatBlockedToast);
+      return;
+    }
+
     setWeekdayRepeat(targetState);
 
     if (targetState) {
       let activeTemplates = weekdayTemplates;
 
-      // 아직 저장된 평일 루틴 템플릿이 없다면 현재 오늘의 일정 또는 월요일 일정에서 자동 추출
+      // 아직 저장된 평일 루틴 템플릿이 없다면 현재 오늘의 일정(평일인 경우) 또는 주간 계획표 평일 일정에서 자동 추출
       if (activeTemplates.length === 0) {
-        if (events.length > 0) {
+        if (!isTodayWeekend() && events.length > 0) {
           activeTemplates = events.map((ev) => ({
             id: `tpl-${ev.start}-${Date.now()}`,
             title: ev.title,
@@ -823,11 +919,16 @@ export default function App() {
       if (activeTemplates.length > 0) {
         applyTemplatesToWeekAndToday(activeTemplates);
       }
+      showToast(t.routineSavedToast);
     }
   }
 
-  // 현재 오늘의 타임라인(events) 전체를 평일(월~금) 루틴으로 즉시 저장 및 적용
-  function saveCurrentDailyAsWeekdayRoutine() {
+  // 현재 오늘의 타임라인(events) 전체를 평일(월~금) 루틴으로 즉시 저장 및 적용 (주말에는 차단)
+  async function saveCurrentDailyAsWeekdayRoutine() {
+    if (isTodayWeekend()) {
+      showToast(t.weekendRepeatBlockedToast);
+      return;
+    }
     if (events.length === 0) return;
     const newTemplates = events.map((ev) => ({
       id: `tpl-${ev.start}-${Date.now()}`,
@@ -839,6 +940,29 @@ export default function App() {
     setWeekdayTemplates(newTemplates);
     setWeekdayRepeat(true);
     applyTemplatesToWeekAndToday(newTemplates);
+    showToast(t.routineSavedToast);
+
+    if (googleToken) {
+      try {
+        setIsSyncing(true);
+        for (const ev of events) {
+          if (!ev.recurringEventId) {
+            await createGoogleCalendarEvent(googleToken, {
+              title: ev.title,
+              start: ev.start,
+              end: ev.end,
+              color: ev.color || "sky",
+              isWeekdayRoutine: true,
+            });
+          }
+        }
+        await syncAllWithGoogle(googleToken, true);
+      } catch (err) {
+        console.warn("평일 루틴 구글 캘린더 반복 등록 실패:", err);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   }
 
   // 앱 실행 시 평일 반복이 켜져 있고 오늘이 월~금(1~5)이면 루틴이 빠져 있을 때 자동으로 채워줌
@@ -852,6 +976,7 @@ export default function App() {
 
   // [1] 타임라인 슬롯 클릭 시 일정 입력창 열기
   function openSlotForm(hour, existingEvent = null) {
+    const weekend = isTodayWeekend();
     if (existingEvent) {
       setEditingEventId(existingEvent.id);
       setActiveSlotHour(existingEvent.start);
@@ -859,7 +984,9 @@ export default function App() {
       setSlotStartHour(existingEvent.start);
       setSlotEndHour(existingEvent.end);
       setSlotColor(existingEvent.color || "sage");
-      setSlotRepeatWeekday(Boolean(existingEvent.isWeekdayRoutine || weekdayRepeat));
+      setSlotRepeatWeekday(
+        weekend ? false : Boolean(existingEvent.isWeekdayRoutine || weekdayRepeat)
+      );
     } else {
       setEditingEventId(null);
       setActiveSlotHour(hour);
@@ -867,7 +994,7 @@ export default function App() {
       setSlotStartHour(hour);
       setSlotEndHour(Math.min(24, hour + 1));
       setSlotColor("sage");
-      setSlotRepeatWeekday(Boolean(weekdayRepeat));
+      setSlotRepeatWeekday(weekend ? false : Boolean(weekdayRepeat));
     }
   }
 
@@ -879,7 +1006,8 @@ export default function App() {
     const cleanTitle = slotTitle.trim();
     const targetId = editingEventId;
     const existingObj = events.find((ev) => ev.id === targetId);
-    const repeatOnWeekdays = Boolean(slotRepeatWeekday);
+    // 주말(토/일)에는 평일 반복이 절대 켜지지 않도록 강제 차단
+    const repeatOnWeekdays = isTodayWeekend() ? false : Boolean(slotRepeatWeekday);
 
     setActiveSlotHour(null);
     setEditingEventId(null);
@@ -977,9 +1105,33 @@ export default function App() {
   async function deleteDailyEvent(evObj) {
     if (!evObj) return;
     setEvents((prev) => prev.filter((x) => x.id !== evObj.id));
-    if (googleToken && evObj.googleEventId) {
+
+    // 해당 일정이 평일 반복 루틴이거나 동일 제목·시간대의 루틴 템플릿이 있으면 주간 시간표(월~금) 및 템플릿에서도 함께 제거
+    setWeekdayTemplates((prev) =>
+      prev.filter(
+        (tpl) => !(tpl.start === evObj.start && tpl.title === evObj.title)
+      )
+    );
+    setWeeklyEvents((prev) =>
+      prev.filter(
+        (w) =>
+          !(
+            w.day >= 0 &&
+            w.day <= 4 &&
+            w.start === evObj.start &&
+            w.title === evObj.title
+          )
+      )
+    );
+
+    if (googleToken) {
       try {
-        await deleteGoogleCalendarEvent(googleToken, evObj.googleEventId);
+        await deleteGoogleCalendarEvent(googleToken, evObj.googleEventId, {
+          recurringEventId: evObj.recurringEventId,
+          title: evObj.title,
+          start: evObj.start,
+          isWeekdayRoutine: evObj.isWeekdayRoutine,
+        });
       } catch (err) {
         console.warn("Google Calendar 일정 삭제 실패:", err);
       }
@@ -1123,6 +1275,8 @@ export default function App() {
         onToggleWeekdayRepeat={toggleWeekdayRepeatMode}
         weekdayTemplates={weekdayTemplates}
         setWeekdayTemplates={setWeekdayTemplates}
+        toastMsg={toastMsg}
+        onShowToast={showToast}
       />
     );
   }
@@ -1130,6 +1284,11 @@ export default function App() {
   return (
     <div className={`popup-viewport ${dark ? "dark" : ""}`}>
       <div className="app-shell popup-mode">
+        {toastMsg && (
+          <div className="floating-toast" role="status">
+            {toastMsg}
+          </div>
+        )}
         {/* 0) 상단 헤더: 오늘 날짜 반영 */}
         <header className="app-header">
           <div className="brand-mark">
@@ -1139,6 +1298,23 @@ export default function App() {
             <div className="header-date-year">{headerDate.yearText}</div>
             <div className="header-date-main">{headerDate.dateText}</div>
           </div>
+          {googleToken && (
+            <button
+              type="button"
+              className={`header-sync-pill ${isSyncing ? "syncing" : ""}`}
+              title={
+                lastSyncedAt
+                  ? `${t.googleSyncNow} (${t.lastSyncedLabel} ${lastSyncedAt})`
+                  : t.googleSyncNow
+              }
+              aria-label={t.googleSyncNow}
+              disabled={isSyncing}
+              onClick={() => syncAllWithGoogle(googleToken)}
+            >
+              <RotateCw size={14} className={isSyncing ? "spin-icon" : ""} />
+              <span>{language === "English" ? "Sync" : "동기화"}</span>
+            </button>
+          )}
           <button
             className="icon-button header-icon"
             aria-label={t.settings}
@@ -1648,7 +1824,14 @@ export default function App() {
                     <input
                       type="checkbox"
                       checked={slotRepeatWeekday}
-                      onChange={(e) => setSlotRepeatWeekday(e.target.checked)}
+                      onChange={(e) => {
+                        if (isTodayWeekend() && e.target.checked) {
+                          setSlotRepeatWeekday(false);
+                          showToast(t.weekendRepeatBlockedToast);
+                          return;
+                        }
+                        setSlotRepeatWeekday(e.target.checked);
+                      }}
                     />
                     <Repeat size={12} />
                     <span>{t.weekdayRepeatCheck}</span>
@@ -1945,6 +2128,7 @@ export default function App() {
    [4] 전체 분석 플랫폼 (한국어 / English UI 연동)
    ========================================================================== */
 function AnalyticsPlatform({
+  setEvents,
   weeklyEvents,
   setWeeklyEvents,
   tasks,
@@ -1969,6 +2153,8 @@ function AnalyticsPlatform({
   onToggleWeekdayRepeat,
   weekdayTemplates,
   setWeekdayTemplates,
+  toastMsg,
+  onShowToast,
 }) {
   const t = UI_TEXT[language] || UI_TEXT["한국어"];
   const days = [
@@ -2112,7 +2298,10 @@ function AnalyticsPlatform({
     const start = Number(editingSlot.start);
     const end = Math.max(start + 1, Number(editingSlot.end));
     const cleanTitle = editingSlot.title.trim();
-    const repeatAllWeekdays = Boolean(editingSlot.repeatWeekdays);
+    const isWeekendSlot = editingSlot.day > 4;
+    const repeatAllWeekdays = isWeekendSlot
+      ? false
+      : Boolean(editingSlot.repeatWeekdays);
     const slotCopy = {
       ...editingSlot,
       start,
@@ -2157,6 +2346,21 @@ function AnalyticsPlatform({
         }));
         return [...filtered, ...added];
       });
+      if (googleToken) {
+        try {
+          await createGoogleCalendarEvent(googleToken, {
+            title: cleanTitle,
+            start,
+            end,
+            color: slotCopy.color,
+            dateObj: getWeekDayDateObj(0), // 월요일 기준 매주 월~금 반복(RRULE) 생성
+            isWeekdayRoutine: true,
+          });
+          if (onSyncGoogle) onSyncGoogle();
+        } catch (err) {
+          console.warn("Google Calendar 평일 반복 일정 생성 실패:", err);
+        }
+      }
       return;
     }
 
@@ -2209,11 +2413,54 @@ function AnalyticsPlatform({
 
   async function deleteWeeklySlot(id) {
     const target = weeklyEvents.find((ev) => ev.id === id);
-    setWeeklyEvents((prev) => prev.filter((ev) => ev.id !== id));
     setEditingSlot(null);
-    if (googleToken && target?.googleEventId) {
+    if (!target) return;
+
+    const isRoutineOrRecurring = Boolean(
+      target.isWeekdayRoutine || target.recurringEventId || target.routineId
+    );
+
+    if (isRoutineOrRecurring) {
+      // 평일 반복 루틴인 경우 월~금 전체 슬롯 + 템플릿 + 일간 일정에서 한 번에 제거
+      setWeeklyEvents((prev) =>
+        prev.filter(
+          (ev) =>
+            !(
+              ev.id === id ||
+              (ev.day >= 0 &&
+                ev.day <= 4 &&
+                ev.start === target.start &&
+                ev.title === target.title)
+            )
+        )
+      );
+      if (setWeekdayTemplates) {
+        setWeekdayTemplates((prev) =>
+          prev.filter(
+            (tpl) =>
+              !(tpl.start === target.start && tpl.title === target.title)
+          )
+        );
+      }
+      if (setEvents) {
+        setEvents((prev) =>
+          prev.filter(
+            (ev) => !(ev.start === target.start && ev.title === target.title)
+          )
+        );
+      }
+    } else {
+      setWeeklyEvents((prev) => prev.filter((ev) => ev.id !== id));
+    }
+
+    if (googleToken) {
       try {
-        await deleteGoogleCalendarEvent(googleToken, target.googleEventId);
+        await deleteGoogleCalendarEvent(googleToken, target.googleEventId, {
+          recurringEventId: target.recurringEventId,
+          title: target.title,
+          start: target.start,
+          isWeekdayRoutine: isRoutineOrRecurring,
+        });
       } catch (err) {
         console.warn("Google Calendar 주간 일정 삭제 실패:", err);
       }
@@ -2262,6 +2509,11 @@ function AnalyticsPlatform({
 
   return (
     <div className={`analytics-platform ${dark ? "dark-report" : "light-report"}`}>
+      {toastMsg && (
+        <div className="floating-toast platform-toast" role="status">
+          {toastMsg}
+        </div>
+      )}
       <header className="platform-header">
         <div className="platform-brand">
           <div className="brand-mark">
@@ -2446,9 +2698,19 @@ function AnalyticsPlatform({
                   <div className="scm-time-row weekly-time-row">
                     <select
                       value={editingSlot.day}
-                      onChange={(e) =>
-                        setEditingSlot({ ...editingSlot, day: Number(e.target.value) })
-                      }
+                      onChange={(e) => {
+                        const nextDay = Number(e.target.value);
+                        if (nextDay > 4 && editingSlot.repeatWeekdays) {
+                          if (onShowToast) onShowToast(t.weekendRepeatBlockedToast);
+                          setEditingSlot({
+                            ...editingSlot,
+                            day: nextDay,
+                            repeatWeekdays: false,
+                          });
+                        } else {
+                          setEditingSlot({ ...editingSlot, day: nextDay });
+                        }
+                      }}
                     >
                       {days.map((d) => (
                         <option key={d.idx} value={d.idx}>
@@ -2518,12 +2780,22 @@ function AnalyticsPlatform({
                         <input
                           type="checkbox"
                           checked={Boolean(editingSlot.repeatWeekdays)}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            if (editingSlot.day > 4 && e.target.checked) {
+                              if (onShowToast) {
+                                onShowToast(t.weekendRepeatBlockedToast);
+                              }
+                              setEditingSlot({
+                                ...editingSlot,
+                                repeatWeekdays: false,
+                              });
+                              return;
+                            }
                             setEditingSlot({
                               ...editingSlot,
                               repeatWeekdays: e.target.checked,
-                            })
-                          }
+                            });
+                          }}
                         />
                         <Repeat size={12} /> {t.weekdayRepeatCheck}
                       </label>

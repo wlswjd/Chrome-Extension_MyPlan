@@ -307,9 +307,13 @@ export async function fetchGoogleCalendarEvents(token) {
     const jsDay = startDate.getDay();
     const weekDayIdx = jsDay === 0 ? 6 : jsDay - 1;
 
+    const isRecurring = Boolean(item.recurringEventId);
+
     weeklyEvents.push({
       id: `gcal-${item.id}`,
       googleEventId: item.id,
+      recurringEventId: item.recurringEventId || null,
+      isWeekdayRoutine: isRecurring,
       day: weekDayIdx,
       start: startHour,
       end: endHour,
@@ -327,6 +331,8 @@ export async function fetchGoogleCalendarEvents(token) {
       dailyEvents.push({
         id: `gcal-${item.id}`,
         googleEventId: item.id,
+        recurringEventId: item.recurringEventId || null,
+        isWeekdayRoutine: isRecurring,
         title,
         start: startHour,
         end: endHour,
@@ -340,22 +346,38 @@ export async function fetchGoogleCalendarEvents(token) {
 
 /**
  * My Plan에서 일정 추가 시 구글 캘린더에 생성
+ * - isWeekdayRoutine이 true이면 매주 월~금(BYDAY=MO,TU,WE,TH,FR) 반복 일정(RRULE)으로 등록되어
+ *   이번 주뿐만 아니라 다음 주, 다다음 주 평일에도 구글 캘린더에 자동 반복 표시됩니다.
  * @param {string} token
- * @param {{ title: string, start: number, end: number, color: string, dateObj?: Date }} ev
+ * @param {{ title: string, start: number, end: number, color: string, dateObj?: Date, isWeekdayRoutine?: boolean }} ev
  */
 export async function createGoogleCalendarEvent(token, ev) {
   const baseDate = ev.dateObj ? new Date(ev.dateObj) : new Date();
+
+  // 평일 반복 일정인데 오늘이 주말(토/일)에 생성한 경우 이번 주 월요일을 시작 기준일로 맞춤
+  if (ev.isWeekdayRoutine && !ev.dateObj) {
+    const day = baseDate.getDay();
+    if (day === 6) baseDate.setDate(baseDate.getDate() - 5); // 토 -> 월
+    if (day === 0) baseDate.setDate(baseDate.getDate() - 6); // 일 -> 월
+  }
+
   const startDt = new Date(baseDate);
   startDt.setHours(ev.start, 0, 0, 0);
 
   const endDt = new Date(baseDate);
   endDt.setHours(ev.end, 0, 0, 0);
 
+  const timeZone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul";
+
   const body = {
     summary: ev.title,
-    start: { dateTime: startDt.toISOString() },
-    end: { dateTime: endDt.toISOString() },
+    start: { dateTime: startDt.toISOString(), timeZone },
+    end: { dateTime: endDt.toISOString(), timeZone },
     colorId: MYPLAN_TO_GCAL_COLOR[ev.color] || "7",
+    ...(ev.isWeekdayRoutine
+      ? { recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"] }
+      : {}),
   };
 
   return googleApiFetch(
@@ -380,10 +402,13 @@ export async function updateGoogleCalendarEvent(token, googleEventId, ev) {
   const endDt = new Date(baseDate);
   endDt.setHours(ev.end, 0, 0, 0);
 
+  const timeZone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul";
+
   const body = {
     summary: ev.title,
-    start: { dateTime: startDt.toISOString() },
-    end: { dateTime: endDt.toISOString() },
+    start: { dateTime: startDt.toISOString(), timeZone },
+    end: { dateTime: endDt.toISOString(), timeZone },
     colorId: MYPLAN_TO_GCAL_COLOR[ev.color] || "7",
   };
 
@@ -401,18 +426,99 @@ export async function updateGoogleCalendarEvent(token, googleEventId, ev) {
 
 /**
  * My Plan에서 일정 삭제 시 구글 캘린더 이벤트 삭제
+ * - 반복 일정(recurringEventId 또는 master ID)인 경우 단일 인스턴스가 아닌
+ *   전체 반복 시리즈(모든 주·모든 연도)를 한 번에 완전히 삭제합니다.
+ * - 로컬 이벤트에 googleEventId가 유실되었더라도 title/start가 전달되면
+ *   구글 캘린더에서 동일한 제목의 반복/단일 일정을 찾아 함께 삭제합니다.
  */
-export async function deleteGoogleCalendarEvent(token, googleEventId) {
-  if (!googleEventId) return;
-  return googleApiFetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
-      googleEventId
-    )}`,
-    token,
-    {
-      method: "DELETE",
+export async function deleteGoogleCalendarEvent(
+  token,
+  googleEventId,
+  options = {}
+) {
+  if (!token) return;
+  const deletedIds = new Set();
+
+  // 1) recurringEventId 또는 인스턴스 ID(xxxx_20261012T...)에서 마스터 이벤트 ID 추출
+  const candidateIds = [];
+  if (options.recurringEventId) {
+    candidateIds.push(options.recurringEventId);
+  }
+  if (googleEventId) {
+    const cleanId = String(googleEventId).replace(/^gcal-/, "");
+    if (cleanId.includes("_")) {
+      candidateIds.push(cleanId.split("_")[0]);
     }
-  );
+    candidateIds.push(cleanId);
+  }
+
+  for (const cid of candidateIds) {
+    if (!cid || deletedIds.has(cid)) continue;
+    deletedIds.add(cid);
+    try {
+      await googleApiFetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
+          cid
+        )}`,
+        token,
+        { method: "DELETE" }
+      );
+    } catch {
+      // 이미 삭제되었거나 존재하지 않는 ID는 무시
+    }
+  }
+
+  // 2) 제목(title) 기준으로 남아있는 동일 반복 시리즈(RRULE) 또는 동일 시간대 일정 검색 후 완전 삭제
+  if (options.title) {
+    try {
+      const url = new URL(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+      );
+      // singleEvents=false 로 조회하면 모든 연도/주에 걸친 마스터 반복 일정(RRULE)이 직접 반환됨
+      url.searchParams.set("singleEvents", "false");
+      url.searchParams.set("q", options.title);
+      url.searchParams.set("maxResults", "100");
+
+      const data = await googleApiFetch(url.toString(), token);
+      const items = data?.items || [];
+
+      for (const item of items) {
+        if (!item?.id || deletedIds.has(item.id) || item.status === "cancelled") {
+          continue;
+        }
+        const sameTitle =
+          (item.summary || "").trim() === String(options.title).trim();
+        if (!sameTitle) continue;
+
+        const startRaw = item.start?.dateTime || item.start?.date;
+        const itemStartHour = startRaw ? new Date(startRaw).getHours() : null;
+        const isRecurringMaster =
+          Array.isArray(item.recurrence) && item.recurrence.length > 0;
+
+        // 반복 일정이거나 시작 시각(시)이 일치하면 마스터 이벤트를 삭제하여 모든 연도/주에서 제거
+        if (
+          isRecurringMaster ||
+          options.start === undefined ||
+          itemStartHour === Number(options.start)
+        ) {
+          deletedIds.add(item.id);
+          try {
+            await googleApiFetch(
+              `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
+                item.id
+              )}`,
+              token,
+              { method: "DELETE" }
+            );
+          } catch {
+            // 무시
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("반복 시리즈 추가 검색 삭제 중 오류:", err);
+    }
+  }
 }
 
 /* ==========================================================================
