@@ -1338,27 +1338,32 @@ select:focus-visible {
   gap: 5px;
 }
 
-/* 데이터 관리 버튼 (샘플 데이터 / 전체 초기화) */
+/* 데이터 관리 버튼 (전체 초기화 단독) */
 .setting-data-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 6px;
   padding: 6px 0;
   border-bottom: 1px solid #edf3fb;
 }
 
+.setting-data-actions.single {
+  grid-template-columns: 1fr;
+}
+
 .data-btn {
+  width: 100%;
   border: 1px solid #dceafa;
   background: #f6faff;
   color: #3f6ca8;
   border-radius: 8px;
-  padding: 5px 6px;
-  font-size: 10px;
+  padding: 6px 8px;
+  font-size: 10.5px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   white-space: nowrap;
 }
 
@@ -1510,40 +1515,138 @@ select:focus-visible {
 .coffee-external-btn {
   background: #ffdd00;
   color: #2b2100;
+  box-shadow: 0 4px 12px rgba(255, 221, 0, 0.35);
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+
+.coffee-external-btn:hover {
+  background: #ffe533;
+  transform: translateY(-1px);
 }
 
 .coffee-qr-box {
   background: #f8fbff;
   border: 1px dashed #cfe2fa;
-  border-radius: 11px;
-  padding: 10px;
+  border-radius: 13px;
+  padding: 12px 10px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
 .coffee-qr-box strong {
-  font-size: 11px;
+  font-size: 11.5px;
+  color: #1e3d6b;
 }
 
-.qr-placeholder {
-  width: 72px;
-  height: 72px;
-  border-radius: 10px;
-  background: #eaf3ff;
-  border: 1px solid #cfe2fa;
-  color: #5b87c1;
-  font-size: 13px;
+.bmc-qr-frame {
+  width: 148px;
+  height: 148px;
+  padding: 8px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1.5px solid #dbe9fb;
+  box-shadow: 0 6px 16px rgba(45, 85, 140, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bmc-qr-frame:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 20px rgba(45, 85, 140, 0.16);
+}
+
+.bmc-qr-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+}
+
+.bmc-url-pill {
+  font-size: 10.5px;
   font-weight: 800;
-  display: grid;
-  place-items: center;
+  color: #8a5600;
+  background: #fff6cf;
+  border: 1px solid #f7df8b;
+  padding: 3px 10px;
+  border-radius: 999px;
 }
 
 .coffee-qr-box small {
   font-size: 10px;
   color: var(--muted);
+}
+
+/* ⚠️ 데이터 전체 초기화 확인 모달 (Yes / No) */
+.confirm-reset-modal {
+  border-color: #f8cbd3;
+}
+
+.danger-modal-title {
+  color: #d6455d;
+}
+
+.confirm-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.confirm-no-btn {
+  border: 1px solid #d5e4f7;
+  background: #f5f9ff;
+  color: #3f6497;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.confirm-no-btn:hover {
+  background: #e7f1ff;
+}
+
+.confirm-yes-btn {
+  border: 0;
+  background: #e0465e;
+  color: #ffffff;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  box-shadow: 0 4px 12px rgba(224, 70, 94, 0.28);
+}
+
+.confirm-yes-btn:hover {
+  background: #c9374e;
+}
+
+.dark .confirm-no-btn {
+  background: #1f293a;
+  border-color: #33435d;
+  color: #c6daf7;
+}
+
+.dark .coffee-qr-box strong {
+  color: #dceaff;
+}
+
+.dark .bmc-url-pill {
+  background: #332a14;
+  border-color: #665222;
+  color: #ffdf7a;
 }
 
 /* 빈 상태 안내 박스 */

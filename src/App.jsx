@@ -29,7 +29,6 @@ import {
   Coffee,
   Github,
   RotateCw,
-  Database,
   ShieldCheck,
   Cloud,
   LogOut,
@@ -58,12 +57,14 @@ import {
    - GitHub 주소, 크롬 웹스토어 주소, 후원 링크 등을 이곳에서 손쉽게 변경하세요.
    ========================================================================== */
 const APP_META = {
-  version: "0.1.0",
+  version: "1.0.0",
   license: "MIT License",
-  githubUrl: "https://github.com/relaxman/my-plan-extension",
-  chromeStoreReviewUrl: "https://chromewebstore.google.com/",
-  buyMeACoffeeUrl: "https://www.buymeacoffee.com/",
-  kakaoPayNote: "카카오페이 / 토스 QR 후원 준비 중입니다.",
+  githubUrl: "https://github.com/wlswjd/Chrome-Extension_MyPlan",
+  chromeStoreReviewUrl:
+    "https://chromewebstore.google.com/detail/jpkechdnaoefpbdmamhoechaghijnmpn/reviews",
+  buyMeACoffeeUrl: "https://buymeacoffee.com/wlswjd",
+  buyMeACoffeeDisplay: "buymeacoffee.com/wlswjd",
+  buyMeACoffeeQr: "./bmc_qr.png",
 };
 
 /* ==========================================================================
@@ -121,9 +122,13 @@ const UI_TEXT = {
     rateUs: "별점 남기기 (Rate Us)",
     rateThanks: "소중한 별점 감사합니다! 스토어로 이동할까요?",
     openStore: "스토어 리뷰 열기",
-    loadSample: "샘플 데이터 채우기",
     clearAllData: "전체 데이터 초기화",
-    confirmClear: "모든 일정, 할 일, 집중 기록을 초기화할까요?",
+    confirmClearTitle: "전체 데이터를 초기화할까요?",
+    confirmClearDesc:
+      "오늘의 타임라인, 주간 시간표, 할 일 목록, 스탑워치 집중 기록 및 평일 루틴이 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+    confirmYes: "네, 초기화합니다 (Yes)",
+    confirmNo: "아니오, 취소 (No)",
+    resetDoneToast: "모든 데이터가 깔끔하게 초기화되었습니다.",
     dataSection: "데이터 관리",
     coffeeBtn: "개발자에게 커피 사주기",
     helpBtn: "정보 및 라이선스",
@@ -202,8 +207,9 @@ const UI_TEXT = {
     githubRepoBtn: "GitHub 저장소 방문하기",
     coffeeModalTitle: "개발자에게 커피 한 잔 선물하기",
     coffeeModalDesc: "My Plan이 하루를 계획하는 데 도움이 되셨나요? 따뜻한 커피 한 잔은 개발자가 꾸준히 기능을 업데이트하는 데 큰 힘이 됩니다!",
-    coffeeGlobalBtn: "Buy Me a Coffee로 후원하기",
-    coffeeLocalTitle: "국내 간편 후원 (카카오페이 / 토스)",
+    coffeeGlobalBtn: "Buy Me a Coffee 페이지 열기",
+    coffeeQrTitle: "카메라로 QR 스캔하여 후원하기",
+    coffeeQrSub: "휴대폰 카메라로 스캔하면 후원 페이지로 바로 연결됩니다.",
     // Google Sync
     googleSectionTitle: "Google 캘린더 · 할 일 연동",
     googleLoginBtn: "Google 계정으로 연동하기",
@@ -241,9 +247,13 @@ const UI_TEXT = {
     rateUs: "Rate Us",
     rateThanks: "Thank you for rating! Leave a review on the store?",
     openStore: "Open Chrome Web Store",
-    loadSample: "Load Sample Data",
     clearAllData: "Reset All Data",
-    confirmClear: "Reset all schedules, tasks, and focus logs to empty?",
+    confirmClearTitle: "Reset All Data?",
+    confirmClearDesc:
+      "All daily schedules, weekly timetables, to-do lists, focus logs, and weekday routines will be permanently deleted.",
+    confirmYes: "Yes, Reset All",
+    confirmNo: "No, Cancel",
+    resetDoneToast: "All data has been reset.",
     dataSection: "Data Management",
     coffeeBtn: "Buy Developer a Coffee",
     helpBtn: "About & License",
@@ -322,7 +332,8 @@ const UI_TEXT = {
     coffeeModalTitle: "Buy the Developer a Coffee",
     coffeeModalDesc: "Has My Plan helped you organize your day? A warm cup of coffee supports continuous updates and new features!",
     coffeeGlobalBtn: "Support on Buy Me a Coffee",
-    coffeeLocalTitle: "Quick QR Support (KakaoPay / Toss)",
+    coffeeQrTitle: "Scan QR Code with Your Phone",
+    coffeeQrSub: "Scan with your phone camera to open buymeacoffee.com/wlswjd",
     // Google Sync
     googleSectionTitle: "Google Calendar & Tasks Sync",
     googleLoginBtn: "Connect with Google",
@@ -352,51 +363,11 @@ const UI_TEXT = {
   },
 };
 
-/* ==========================================================================
-   [가이드 5] 샘플 데이터 (설정에서 '샘플 데이터 채우기'를 누를 때만 사용됨)
-   - plan.md 0번에 따라 초기 실행 상태는 더미 데이터가 없는 빈 배열([])로 시작합니다.
-   ========================================================================== */
-const sampleTasks = [
-  { id: 1, title: "부트캠프 강의 듣기", tag: "학습", done: true },
-  { id: 2, title: "아침 유산소 운동하기", tag: "운동", done: true },
-  { id: 3, title: "자격증 기출문제 풀이", tag: "공부", done: false },
-  { id: 4, title: "기술 블로그 글 정리", tag: "업무", done: false },
-  { id: 5, title: "독서 및 스트레칭", tag: "휴식", done: true },
-  { id: 6, title: "건강한 저녁 식사", tag: "식사", done: true },
-];
-
-const sampleEvents = [
-  { id: 1, title: "아침 운동", start: 7, end: 8, color: "sage" },
-  { id: 2, title: "부트캠프 집중 학습", start: 10, end: 13, color: "sky" },
-  { id: 3, title: "프로젝트 실습", start: 14, end: 17, color: "periwinkle" },
-  { id: 4, title: "저녁 식사 및 휴식", start: 19, end: 20, color: "peach" },
-  { id: 5, title: "자격증 공부", start: 21, end: 23, color: "rose" },
-];
-
-const sampleWeeklyEvents = [
-  { id: 101, day: 0, start: 7, end: 8, title: "아침 운동", color: "sage", done: true },
-  { id: 102, day: 0, start: 9, end: 13, title: "부트캠프 강의", color: "sky", done: true },
-  { id: 103, day: 0, start: 14, end: 18, title: "알고리즘 풀이", color: "periwinkle", done: true },
-  { id: 105, day: 1, start: 9, end: 12, title: "프론트엔드 실습", color: "sky", done: true },
-  { id: 106, day: 1, start: 13, end: 17, title: "팀 프로젝트", color: "periwinkle", done: true },
-  { id: 110, day: 2, start: 10, end: 14, title: "부트캠프 라이브", color: "sky", done: true },
-  { id: 113, day: 3, start: 9, end: 12, title: "리액트 심화 학습", color: "sky", done: true },
-  { id: 118, day: 4, start: 10, end: 15, title: "주간 프로젝트 마감", color: "sky", done: true },
-  { id: 122, day: 5, start: 10, end: 14, title: "자격증 모의고사", color: "sky", done: false },
-];
-
 function getIsoDate(offsetDays = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-const sampleFocusSessions = [
-  { id: 204, date: getIsoDate(-1), startHour: 10, durationMinutes: 50, order: 1, timeStr: "10:00" },
-  { id: 205, date: getIsoDate(-1), startHour: 15, durationMinutes: 60, order: 2, timeStr: "15:20" },
-  { id: 207, date: getIsoDate(-2), startHour: 9, durationMinutes: 60, order: 1, timeStr: "09:00" },
-  { id: 209, date: getIsoDate(-3), startHour: 10, durationMinutes: 60, order: 1, timeStr: "10:15" },
-];
 
 function formatSessionOrder(n, lang) {
   if (lang === "English") {
@@ -487,6 +458,7 @@ export default function App() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showCoffeeModal, setShowCoffeeModal] = useState(false);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [showWeekly, setShowWeekly] = useState(isReportPageFromUrl);
 
   // [Google OAuth & 캘린더/할일 양방향 연동 상태]
@@ -632,22 +604,21 @@ export default function App() {
     setShowWeekly(true);
   }
 
-  // 데이터 관리: 샘플 데이터 채우기 / 전체 초기화
-  function handleLoadSampleData() {
-    setTasks(sampleTasks);
-    setEvents(sampleEvents);
-    setWeeklyEvents(sampleWeeklyEvents);
-    setFocusSessions(sampleFocusSessions);
+  // 데이터 관리: 전체 초기화 경고 모달 열기 & 실제 초기화 실행
+  function handleClearAllData() {
     setShowSettings(false);
+    setShowClearConfirmModal(true);
   }
 
-  function handleClearAllData() {
-    if (!window.confirm(t.confirmClear)) return;
+  function executeClearAllData() {
     setTasks([]);
     setEvents([]);
     setWeeklyEvents([]);
     setFocusSessions([]);
-    setShowSettings(false);
+    setWeekdayTemplates([]);
+    setWeekdayRepeat(false);
+    setShowClearConfirmModal(false);
+    showToast(t.resetDoneToast);
   }
 
   /* ==========================================================================
@@ -1532,11 +1503,8 @@ export default function App() {
               )}
             </div>
 
-            {/* 데이터 관리 (샘플 채우기 / 전체 초기화) */}
-            <div className="setting-data-actions">
-              <button type="button" className="data-btn" onClick={handleLoadSampleData}>
-                <Database size={13} /> {t.loadSample}
-              </button>
+            {/* 데이터 관리 (전체 데이터 초기화 단독 버튼) */}
+            <div className="setting-data-actions single">
               <button type="button" className="data-btn danger" onClick={handleClearAllData}>
                 <RotateCw size={13} /> {t.clearAllData}
               </button>
@@ -1685,10 +1653,43 @@ export default function App() {
           </div>
         )}
 
-        {/* ☕ 커피 후원 모달 (Buy Me a Coffee / 카카오페이·토스 안내) */}
+        {/* ⚠️ 전체 데이터 초기화 경고 확인 모달 (Yes / No) */}
+        {showClearConfirmModal && (
+          <div className="modal-backdrop" onClick={() => setShowClearConfirmModal(false)}>
+            <div className="modal-card confirm-reset-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 className="danger-modal-title">
+                  <Trash2 size={17} /> {t.confirmClearTitle}
+                </h3>
+                <button className="icon-button" onClick={() => setShowClearConfirmModal(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="modal-desc">{t.confirmClearDesc}</p>
+              <div className="confirm-modal-actions">
+                <button
+                  type="button"
+                  className="confirm-no-btn"
+                  onClick={() => setShowClearConfirmModal(false)}
+                >
+                  {t.confirmNo}
+                </button>
+                <button
+                  type="button"
+                  className="confirm-yes-btn"
+                  onClick={executeClearAllData}
+                >
+                  <Trash2 size={13} /> {t.confirmYes}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ☕ 커피 후원 모달 (Buy Me a Coffee 링크 & 전용 QR 스캔) */}
         {showCoffeeModal && (
           <div className="modal-backdrop" onClick={() => setShowCoffeeModal(false)}>
-            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-card coffee-modal-card" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h3>
                   <Coffee size={17} /> {t.coffeeModalTitle}
@@ -1706,9 +1707,20 @@ export default function App() {
                 <Coffee size={16} /> {t.coffeeGlobalBtn} <ExternalLink size={13} />
               </button>
               <div className="coffee-qr-box">
-                <strong>{t.coffeeLocalTitle}</strong>
-                <div className="qr-placeholder">QR</div>
-                <small>{APP_META.kakaoPayNote}</small>
+                <strong>{t.coffeeQrTitle}</strong>
+                <div
+                  className="bmc-qr-frame"
+                  onClick={() => openExternalUrl(APP_META.buyMeACoffeeUrl)}
+                  title={APP_META.buyMeACoffeeUrl}
+                >
+                  <img
+                    src={APP_META.buyMeACoffeeQr}
+                    alt="Buy Me a Coffee QR Code"
+                    className="bmc-qr-img"
+                  />
+                </div>
+                <span className="bmc-url-pill">{APP_META.buyMeACoffeeDisplay}</span>
+                <small>{t.coffeeQrSub}</small>
               </div>
             </div>
           </div>
