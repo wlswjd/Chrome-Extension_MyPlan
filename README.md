@@ -1,106 +1,71 @@
-# My Plan — Daily Schedule, To-Do & Focus Analytics Chrome Extension
+# My Plan
 
-**My Plan** is a pastel-themed productivity Chrome Extension designed to help you organize your daily schedule, manage tag-based to-do lists, track focus sessions with a built-in Pomodoro stopwatch, and review your weekly performance in a full-screen analytics dashboard.
-
----
-
-## Key Features
-
-### 1. Daily Schedule (Popup Tab 1)
-- **Live Today's Date Header**: Automatically displays the current year, month, day, and day of the week in the top header.
-- **Customizable Time Range**: Adjust the visible timeline hours (e.g., `06:00 ~ 23:00`) using the top-right dropdown selectors.
-- **Quick Slot Creation & Editing**:
-  - Hover over any empty hour slot and click the `+` button to add a new schedule block.
-  - Click any existing schedule block to edit its title, time range, or delete it.
-  - **7 Pastel Color Palette**: Categorize your events visually with 7 soft pastel colors (Rose, Peach, Butter, Sage, Sky, Periwinkle, Stone).
-
-### 2. To-Do List (Popup Tab 2)
-- **Tag-Based Task Management**: Add tasks quickly along with a category tag (`#학습`, `#운동`, `#공부`, `#업무`, `#휴식`, `#식사`, `#기타`).
-- **Progress Tracking**: View your real-time completion count and progress bar at the top.
-- **Status Filters**: Filter tasks by `전체` (All), `오늘` (Active/Remaining), or `완료` (Completed).
-
-### 3. Focus Stopwatch (Popup Tab 3)
-- **Circular Pomodoro Timer**: Stay focused with a visual progress ring and quick presets (`25m Pomodoro`, `50m Deep Focus`, `1h Immersion`).
-- **Automatic Daily Session Log (`오늘의 집중 기록`)**:
-  - Records the exact real-world start time (e.g., `09:10`) when you press **Start (`시작하기`)**.
-  - Automatically logs completed sessions (or sessions reset after 1+ minute of focus) in sequential order (`첫 번째 세션`, `두 번째 세션`, etc.).
-  - Automatically resets the daily list in the popup at midnight while preserving past records for the analytics dashboard.
-
-### 4. Full-Screen Weekly & Focus Analytics Dashboard
-Click the **Analytics icon** (next to the Settings gear icon in the top-right corner) to open the full-page dashboard:
-- **6 Top KPI Summary Cards**: View Total Focus Time, Weekly Focus Time, Today's Focus Time, Completed Tasks, Completed Weekly Blocks, and Overall Achievement Rate at a glance.
-- **Interactive Weekly Timetable**: Click any cell across Monday–Sunday to add, edit, color-code, or mark weekly schedule blocks as completed.
-- **Weekly Memo**: Write reflections and goals for the week.
-- **Achievement Rate Donut Chart**: Visualizes your completion rate, total planned hours, completed hours, and remaining hours.
-- **Tag Ratio Breakdown**: Automatically calculates and displays the percentage distribution of your To-Do tags.
-- **Stopwatch Focus Heatmap & Monthly Goal Calendar**: Inspect your 10-day hourly focus distribution and track daily focus goals (e.g., `3H/day`) on a monthly calendar.
-- **Light & Dark Theme Toggle**: Switch seamlessly between the Pastel Light Report theme and the Dark Report theme.
+크롬 브라우저에서 바로 열어 쓰는 파스텔 톤 데일리 플래너 & 집중 타이머 확장 프로그램입니다.  
+하루 시간표 정리, 태그별 할 일(To-Do) 체크, 뽀모도로 타이머 기록을 한 곳에서 관리하고 싶어서 만들었습니다.
 
 ---
 
-## Getting Started & Usage
+## 주요 기능
 
-### Prerequisites
-- **Node.js** (v18+ recommended)
-- **npm**
+- **오늘의 일정 (타임라인)**
+  - 시간대별로 일정을 블록 형태로 등록하고 색상(7가지 파스텔 컬러)으로 구분할 수 있습니다.
+  - 자주 반복되는 평일 일정은 **평일 루틴 자동 반복(월~금)**을 켜두면 매주 평일에 자동으로 채워집니다.
+- **할 일 목록 (To-Do)**
+  - `#학습`, `#업무`, `#운동`, `#휴식` 등 태그를 붙여 할 일을 등록하고 진행률을 확인할 수 있습니다.
+- **집중 스톱워치**
+  - 25분 / 50분 / 1시간 프리셋을 지원하는 타이머입니다.
+  - 집중을 마칠 때마다 그날의 집중 세션이 시간순으로 기록됩니다.
+- **주간 리포트 대시보드**
+  - 우측 상단 차트 아이콘을 누르면 전체 화면 대시보드가 열립니다.
+  - 주간 시간표, 달성률 차트, 태그별 비중, 일별 집중 히트맵과 월간 목표 캘린더를 한눈에 볼 수 있습니다(라이트/다크 모드 지원).
+- **Google 캘린더 & Tasks 연동 (선택)**
+  - 설정에서 Google 계정을 연결하면 일정과 할 일을 구글 캘린더 및 Google Tasks와 양방향으로 동기화할 수 있습니다.
 
-### 1. Install Dependencies
+---
+
+## 로컬에서 실행 및 빌드하기
+
+Node.js(v18 이상 권장) 환경에서 실행할 수 있습니다.
+
 ```bash
+# 패키지 설치
 npm install
-```
 
-### 2. Run in Development Mode (Local Preview)
-To preview and test the UI in your browser with hot-reload:
-```bash
+# 개발 서버 실행 (http://localhost:5173)
 npm run dev
-```
-- **Popup View**: Open `http://localhost:5173`
-- **Full Analytics Dashboard View**: Open `http://localhost:5173/?page=report`
 
-### 3. Build & Load as a Chrome Extension
-Whenever you make changes to the source code, build the production bundle into the `dist/` folder:
-```bash
+# 크롬 확장프로그램용 프로덕션 빌드 (dist 폴더 생성)
 npm run build
 ```
 
-Then load it into Google Chrome:
-1. Open Chrome and navigate to `chrome://extensions/`.
-2. Enable **Developer mode** (toggle in the top-right corner).
-3. Click **Load unpacked** (압축해제된 확장 프로그램을 로드합니다).
-4. Select the **`dist`** folder inside this project directory.
-5. Pin **My Plan** to your Chrome toolbar and click its icon to open the popup!
-   *(If the extension is already loaded, click the **Reload** icon on the extension card in `chrome://extensions/` after running `npm run build`.)*
+### 크롬에 직접 등록해서 테스트하는 방법
+1. `npm run build`를 실행해 `dist` 폴더를 생성합니다.
+2. 크롬 주소창에 `chrome://extensions`를 입력해 이동합니다.
+3. 우측 상단 **개발자 모드**를 켜고, 좌측 상단 **압축해제된 확장 프로그램을 로드합니다**를 클릭합니다.
+4. 프로젝트 안의 **`dist` 폴더**를 선택하면 툴바에 **My Plan** 아이콘이 추가됩니다.
 
 ---
 
-## Customization Guide
-
-All main configuration constants are located at the top of `src/App.jsx` for easy editing:
-
-| What to Customize | File & Variable | Description |
-| :--- | :--- | :--- |
-| **Schedule Colors** | `src/App.jsx` → `SCHEDULE_COLORS` | Edit hex/background colors for the 7 circular color pickers in the timeline. |
-| **To-Do Tags** | `src/App.jsx` → `TAG_CONFIG` | Add, rename, or recolor task tags used in the To-Do List and Tag Ratio chart. |
-| **Timer Presets** | `src/App.jsx` → `PRESET_LIST` | Change default stopwatch durations (in minutes) and labels. |
-| **Initial Seed Data** | `src/App.jsx` → `seedTasks`, `seedEvents`, `seedWeeklyEvents`, `seedFocusSessions` | Modify or clear (`[]`) the initial sample data loaded on first run. |
-| **Popup Size & Theme** | `src/styles.css` → `:root`, `.popup-viewport` | Adjust color variables or popup dimensions (`390px × 590px`). |
-
-> **Tip**: Because changes are persisted in `localStorage`, if you edit the initial `seed*` arrays in `src/App.jsx` and want to see them reflected immediately, clear your browser's `localStorage` (DevTools → Application → Local Storage → Clear) and reload.
-
----
-
-## Project Structure
+## 폴더 구조
 
 ```text
 my-plan-extension/
 ├── public/
-│   └── manifest.json      # Chrome Extension Manifest V3 configuration
+│   ├── manifest.json      # Chrome Extension Manifest V3 설정
+│   └── MyPlan_icon.png    # 확장 프로그램 아이콘
 ├── src/
-│   ├── App.jsx            # Main Popup UI & Full Analytics Platform components
-│   ├── main.jsx           # React entry point
-│   └── styles.css         # Styles for Popup & Analytics views (Light & Dark modes)
-├── index.html             # HTML template (includes Noto Sans KR & Nunito fonts)
-├── plan.md                # Future roadmap & feature implementation plan
+│   ├── App.jsx            # 팝업 UI 및 주간 리포트 대시보드
+│   ├── googleSync.js      # Google Calendar / Tasks OAuth 및 동기화 로직
+│   ├── main.jsx           # 엔트리 포인트
+│   └── styles.css         # 전체 스타일시트
+├── PRIVACY_POLICY.md      # 개인정보처리방침
+├── index.html
 ├── package.json
 └── vite.config.js
 ```
+
+---
+
+## 개인정보 보호 안내
+
+작성한 일정, 할 일, 타이머 기록은 기본적으로 브라우저 내부 저장소(`localStorage` / `chrome.storage.local`)에만 저장되며 외부 서버로 전송되지 않습니다. 자세한 내용은 [PRIVACY_POLICY.md](./PRIVACY_POLICY.md)를 참고해 주세요.
