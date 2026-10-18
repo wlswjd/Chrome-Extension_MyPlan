@@ -5,7 +5,7 @@
    ========================================================================== */
 
 export const DEFAULT_GOOGLE_CLIENT_ID =
-  "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+  "361625898849-q26bk8vkgtghucrbn9g314l1qpms622g.apps.googleusercontent.com";
 
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
@@ -73,33 +73,6 @@ export function getRedirectUri() {
 export async function loginWithGoogle(customClientId) {
   const clientId = getActiveClientId(customClientId);
 
-  // 방법 A: 크롬 확장프로그램 네이티브 getAuthToken 시도 (manifest.json에 client_id를 넣은 경우)
-  if (
-    typeof chrome !== "undefined" &&
-    chrome.identity?.getAuthToken &&
-    !customClientId
-  ) {
-    try {
-      const token = await new Promise((resolve, reject) => {
-        chrome.identity.getAuthToken({ interactive: true }, (tok) => {
-          if (chrome.runtime.lastError || !tok) {
-            reject(
-              new Error(
-                chrome.runtime.lastError?.message ||
-                  "getAuthToken 토큰 발급 실패"
-              )
-            );
-          } else {
-            resolve(tok);
-          }
-        });
-      });
-      if (token) return token;
-    } catch {
-      // manifest.json의 client_id가 아직 기본값이면 아래 WebAuthFlow로 자동 전환
-    }
-  }
-
   if (!clientId) {
     throw new Error("NEED_CLIENT_ID");
   }
@@ -112,7 +85,7 @@ export async function loginWithGoogle(customClientId) {
   authUrl.searchParams.set("scope", GOOGLE_SCOPES.join(" "));
   authUrl.searchParams.set("prompt", "select_account");
 
-  // 방법 B: 크롬 확장프로그램 launchWebAuthFlow (UI에서 Client ID를 입력한 경우 포함)
+  // 방법 A: 크롬 확장프로그램 launchWebAuthFlow (웹 애플리케이션 Client ID + chromiumapp.org 리디렉션 URI 방식)
   if (typeof chrome !== "undefined" && chrome.identity?.launchWebAuthFlow) {
     const responseUrl = await new Promise((resolve, reject) => {
       chrome.identity.launchWebAuthFlow(

@@ -57,7 +57,7 @@ import {
    - GitHub 주소, 크롬 웹스토어 주소, 후원 링크 등을 이곳에서 손쉽게 변경하세요.
    ========================================================================== */
 const APP_META = {
-  version: "1.0.0",
+  version: "1.0.1",
   license: "MIT License",
   githubUrl: "https://github.com/wlswjd/Chrome-Extension_MyPlan",
   chromeStoreReviewUrl:
