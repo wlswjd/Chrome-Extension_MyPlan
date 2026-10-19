@@ -135,10 +135,11 @@ select:focus-visible {
 }
 
 .header-date-year {
-  font-size: 16px;
+  font-size: 13.5px;
   font-weight: 800;
-  color: #1e3d6b;
+  color: #4f72a3;
   letter-spacing: -0.3px;
+  white-space: nowrap;
 }
 
 .header-date-main {
@@ -146,6 +147,7 @@ select:focus-visible {
   font-weight: 800;
   color: #1e3d6b;
   letter-spacing: -0.4px;
+  white-space: nowrap;
 }
 
 .brand-name {
@@ -284,7 +286,7 @@ select:focus-visible {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px 12px 10px;
+  padding: 13px 10px 10px;
   border-radius: 16px;
   border: 1px solid #e3eefc;
 }
@@ -293,10 +295,11 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 4px;
   margin-bottom: 10px;
   flex-shrink: 0;
   flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .timeline-simple-title {
@@ -312,7 +315,7 @@ select:focus-visible {
 .time-range-picker {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
@@ -320,16 +323,16 @@ select:focus-visible {
   border: 1px solid #e1edfb;
   background: #f6faff;
   color: #1e3d6b;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  padding: 3px 5px;
+  padding: 2.5px 4px;
   border-radius: 7px;
   cursor: pointer;
 }
 
 .range-tilde {
   color: #6987b0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 

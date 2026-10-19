@@ -67,10 +67,11 @@ export function getRedirectUri() {
 
 /**
  * 1) 구글 OAuth 로그인 (액세스 토큰 발급)
- * - manifest.json에 유효한 client_id가 있으면 chrome.identity.getAuthToken을 먼저 시도하고,
- *   UI에서 입력한 Client ID를 쓰거나 웹 환경이면 launchWebAuthFlow / 팝업 OAuth를 사용합니다.
+ * @param {string} customClientId
+ * @param {{ interactive?: boolean, loginHint?: string }} options
  */
-export async function loginWithGoogle(customClientId) {
+export async function loginWithGoogle(customClientId, options = {}) {
+  const interactive = options.interactive !== undefined ? options.interactive : true;
   const clientId = getActiveClientId(customClientId);
 
   if (!clientId) {
@@ -83,13 +84,20 @@ export async function loginWithGoogle(customClientId) {
   authUrl.searchParams.set("response_type", "token");
   authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("scope", GOOGLE_SCOPES.join(" "));
-  authUrl.searchParams.set("prompt", "select_account");
+  if (interactive) {
+    authUrl.searchParams.set("prompt", "select_account");
+  } else {
+    authUrl.searchParams.set("prompt", "none");
+    if (options.loginHint) {
+      authUrl.searchParams.set("login_hint", options.loginHint);
+    }
+  }
 
   // 방법 A: 크롬 확장프로그램 launchWebAuthFlow (웹 애플리케이션 Client ID + chromiumapp.org 리디렉션 URI 방식)
   if (typeof chrome !== "undefined" && chrome.identity?.launchWebAuthFlow) {
     const responseUrl = await new Promise((resolve, reject) => {
       chrome.identity.launchWebAuthFlow(
-        { url: authUrl.toString(), interactive: true },
+        { url: authUrl.toString(), interactive },
         (redirectedTo) => {
           if (chrome.runtime.lastError || !redirectedTo) {
             reject(
@@ -319,19 +327,29 @@ export async function fetchGoogleCalendarEvents(token) {
 
 /**
  * My Plan에서 일정 추가 시 구글 캘린더에 생성
- * - isWeekdayRoutine이 true이면 매주 월~금(BYDAY=MO,TU,WE,TH,FR) 반복 일정(RRULE)으로 등록되어
- *   이번 주뿐만 아니라 다음 주, 다다음 주 평일에도 구글 캘린더에 자동 반복 표시됩니다.
+ * - isWeekdayRoutine이 true이면 이번 주 월~금(BYDAY=MO,TU,WE,TH,FR)에만 반복되도록
+ *   이번 주 금요일 23:59:59 UTC를 UNTIL로 지정하여 다음 주/내년까지 무한 반복되지 않고 깔끔하게 유지됩니다.
  * @param {string} token
  * @param {{ title: string, start: number, end: number, color: string, dateObj?: Date, isWeekdayRoutine?: boolean }} ev
  */
 export async function createGoogleCalendarEvent(token, ev) {
   const baseDate = ev.dateObj ? new Date(ev.dateObj) : new Date();
 
-  // 평일 반복 일정인데 오늘이 주말(토/일)에 생성한 경우 이번 주 월요일을 시작 기준일로 맞춤
-  if (ev.isWeekdayRoutine && !ev.dateObj) {
-    const day = baseDate.getDay();
-    if (day === 6) baseDate.setDate(baseDate.getDate() - 5); // 토 -> 월
-    if (day === 0) baseDate.setDate(baseDate.getDate() - 6); // 일 -> 월
+  // 평일 반복 일정인 경우 해당 주의 월요일을 시작 기준일로 맞추고, 해당 주 금요일을 종료일(UNTIL)로 계산
+  let untilRulePart = "";
+  if (ev.isWeekdayRoutine) {
+    const day = baseDate.getDay(); // 0(일) ~ 6(토)
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    baseDate.setDate(baseDate.getDate() + diffToMon);
+
+    const fridayEnd = new Date(baseDate);
+    fridayEnd.setDate(baseDate.getDate() + 4);
+    fridayEnd.setHours(23, 59, 59, 0);
+    const untilUtc = fridayEnd
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}Z$/, "Z");
+    untilRulePart = `;UNTIL=${untilUtc}`;
   }
 
   const startDt = new Date(baseDate);
@@ -349,7 +367,11 @@ export async function createGoogleCalendarEvent(token, ev) {
     end: { dateTime: endDt.toISOString(), timeZone },
     colorId: MYPLAN_TO_GCAL_COLOR[ev.color] || "7",
     ...(ev.isWeekdayRoutine
-      ? { recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"] }
+      ? {
+          recurrence: [
+            `RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR${untilRulePart}`,
+          ],
+        }
       : {}),
   };
 
@@ -499,21 +521,25 @@ export async function deleteGoogleCalendarEvent(
    - 할 일 제목 또는 notes 필드에 태그(#학습 등)를 함께 저장하여 양방향 복원
    ========================================================================== */
 
-const VALID_TAGS = ["학습", "운동", "공부", "업무", "휴식", "식사", "기타"];
+const VALID_TAGS = ["학습", "운동", "업무", "휴식", "식사", "기타"];
 
 function parseTaskFromGoogle(gTask) {
   let rawTitle = (gTask.title || "").trim();
   let tag = "학습";
 
-  // notes에 [tag:운동] 형식이 있거나 제목 앞에 [#운동] 이 있으면 태그로 추출
+  // notes에 [tag:운동] 형식이 있거나 제목 앞에 [#운동] 이 있으면 태그로 추출 ("공부"는 "학습"으로 통합)
   const noteMatch = (gTask.notes || "").match(/\[tag:([^\]]+)\]/);
-  if (noteMatch && VALID_TAGS.includes(noteMatch[1])) {
-    tag = noteMatch[1];
+  if (noteMatch) {
+    const extracted = noteMatch[1] === "공부" ? "학습" : noteMatch[1];
+    if (VALID_TAGS.includes(extracted)) tag = extracted;
   } else {
     const prefixMatch = rawTitle.match(/^\[#([^\]]+)\]\s*(.+)$/);
-    if (prefixMatch && VALID_TAGS.includes(prefixMatch[1])) {
-      tag = prefixMatch[1];
-      rawTitle = prefixMatch[2];
+    if (prefixMatch) {
+      const extracted = prefixMatch[1] === "공부" ? "학습" : prefixMatch[1];
+      if (VALID_TAGS.includes(extracted)) {
+        tag = extracted;
+        rawTitle = prefixMatch[2];
+      }
     }
   }
 

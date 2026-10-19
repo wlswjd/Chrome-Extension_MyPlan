@@ -88,7 +88,6 @@ const COLOR_MAP = Object.fromEntries(SCHEDULE_COLORS.map((c) => [c.id, c]));
 const TAG_CONFIG = {
   학습: { className: "tag-blue", hex: "#5a9cf8", ko: "학습", en: "Study" },
   운동: { className: "tag-mint", hex: "#4ecdc4", ko: "운동", en: "Workout" },
-  공부: { className: "tag-purple", hex: "#9b8afb", ko: "공부", en: "Exam" },
   업무: { className: "tag-orange", hex: "#f7a35c", ko: "업무", en: "Work" },
   휴식: { className: "tag-pink", hex: "#f490b9", ko: "휴식", en: "Rest" },
   식사: { className: "tag-mint", hex: "#6dd3b3", ko: "식사", en: "Meal" },
@@ -132,7 +131,7 @@ const UI_TEXT = {
     dataSection: "데이터 관리",
     coffeeBtn: "개발자에게 커피 사주기",
     helpBtn: "정보 및 라이선스",
-    todayTimeline: "오늘의 타임라인",
+    todayTimeline: "스케쥴표",
     emptyTimelineHint: "시간대에 마우스를 올려 + 버튼으로 일정을 추가해 보세요.",
     eventNamePlaceholder: "일정 이름",
     delete: "삭제",
@@ -227,13 +226,16 @@ const UI_TEXT = {
     lastSyncedLabel: "최근 동기화:",
     copiedText: "복사됨!",
     copyText: "복사",
-    // 평일 루틴 반복 기능
-    weekdayRepeatTitle: "평일 루틴 자동 반복 (월~금)",
-    weekdayRepeatDesc: "ON 시 주간 계획표나 오늘의 일정을 평일마다 자동으로 채워줍니다.",
-    weekdayRepeatCheck: "평일(월~금) 매일 반복 루틴으로 등록",
-    weekdayRepeatShort: "평일 반복",
-    saveAsWeekdayRoutine: "오늘 일정을 평일 루틴으로 저장",
-    routineSavedToast: "평일 루틴이 적용되었습니다!",
+    // 평일 루틴 & 전주 루틴 불러오기 기능
+    weekdayRepeatTitle: "이번 주 평일 루틴 (월~금)",
+    weekdayRepeatDesc: "저장된 평일 루틴을 이번 주(월~금)에만 깔끔하게 불러옵니다.",
+    weekdayRepeatCheck: "이번 주 평일(월~금) 반복 루틴으로 등록",
+    loadPrevRoutineBtn: "전주 루틴 불러오기",
+    loadPrevRoutineTitle: "저장된 전주(평일) 루틴을 이번 주 월~금에 불러옵니다",
+    saveAsWeekdayRoutine: "현재 일정을 평일 루틴으로 저장",
+    routineSavedToast: "이번 주 평일(월~금)에 루틴이 적용되었습니다!",
+    emptyRoutineToast:
+      "저장된 평일 루틴이 없습니다. 일정을 추가할 때 '이번 주 평일 반복'을 체크해 보세요!",
     weekendRepeatBlockedToast:
       "평일(월~금)에만 적용할 수 있습니다. 주말(토·일)에는 적용되지 않아요!",
   },
@@ -257,7 +259,7 @@ const UI_TEXT = {
     dataSection: "Data Management",
     coffeeBtn: "Buy Developer a Coffee",
     helpBtn: "About & License",
-    todayTimeline: "Today's Timeline",
+    todayTimeline: "Schedule",
     emptyTimelineHint: "Hover over any time slot and click + to add a schedule.",
     eventNamePlaceholder: "Event title",
     delete: "Delete",
@@ -352,12 +354,15 @@ const UI_TEXT = {
     copiedText: "Copied!",
     copyText: "Copy",
     // Weekday Routine Repeat
-    weekdayRepeatTitle: "Weekday Auto-Repeat (Mon–Fri)",
-    weekdayRepeatDesc: "Automatically applies your weekday schedule routine every Mon–Fri.",
-    weekdayRepeatCheck: "Repeat every weekday (Mon–Fri)",
-    weekdayRepeatShort: "Weekday Repeat",
+    weekdayRepeatTitle: "This Week's Routine (Mon–Fri)",
+    weekdayRepeatDesc: "Load your saved weekday routine into this week (Mon–Fri) only.",
+    weekdayRepeatCheck: "Repeat this week's weekdays (Mon–Fri)",
+    loadPrevRoutineBtn: "Load Prev Routine",
+    loadPrevRoutineTitle: "Apply saved weekday routine to this week (Mon–Fri)",
     saveAsWeekdayRoutine: "Save Today as Weekday Routine",
-    routineSavedToast: "Weekday routine applied!",
+    routineSavedToast: "Routine applied to this week (Mon–Fri)!",
+    emptyRoutineToast:
+      "No saved routine yet. Check 'Repeat this week' when adding a schedule!",
     weekendRepeatBlockedToast:
       "Weekday routine can only be applied on weekdays (Mon–Fri)!",
   },
@@ -381,24 +386,30 @@ function formatSessionOrder(n, lang) {
 
 function getHeaderDateParts(lang) {
   const d = new Date();
+  const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).getDay(); // 0(일) ~ 6(토)
+  const weekOfMonth = Math.ceil((d.getDate() + firstDayOfMonth) / 7);
+
   if (lang === "English") {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return {
-      yearText: `${d.getFullYear()}`,
+      yearText: `${d.getFullYear()} · ${months[d.getMonth()]} W${weekOfMonth}`,
       dateText: `${months[d.getMonth()]} ${d.getDate()} (${weekdays[d.getDay()]})`,
     };
   }
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+  const weekNamesKo = ["첫째주", "둘째주", "셋째주", "넷째주", "다섯째주", "여섯째주"];
+  const weekLabelKo = weekNamesKo[weekOfMonth - 1] || `${weekOfMonth}째주`;
   return {
-    yearText: `${d.getFullYear()}년`,
+    yearText: `${d.getFullYear()}년 · ${d.getMonth() + 1}월 ${weekLabelKo}`,
     dateText: `${d.getMonth() + 1}월 ${d.getDate()}일(${weekdays[d.getDay()]})`,
   };
 }
 
 function getTagLabel(tagKey, lang) {
-  const cfg = TAG_CONFIG[tagKey];
-  if (!cfg) return tagKey;
+  const normalizedKey = tagKey === "공부" ? "학습" : tagKey;
+  const cfg = TAG_CONFIG[normalizedKey];
+  if (!cfg) return normalizedKey;
   return lang === "English" ? cfg.en : cfg.ko;
 }
 
@@ -471,12 +482,13 @@ export default function App() {
   const [syncError, setSyncError] = useState("");
   const [copiedRedirect, setCopiedRedirect] = useState(false);
 
-  // [1] Daily Schedule 타임라인 시간 범위: 확장프로그램을 켤 때마다 현재 시각(시)이 맨 위에 오도록 설정
-  // 예: 12:49에 켜면 12:00부터 시작, 15:30에 켜면 15:00부터 시작
-  const [startHour, setStartHour] = useState(() => new Date().getHours());
+  // [1] Daily Schedule 타임라인 시간 범위: 상단 필터는 항상 06:00 ~ 23:00을 기본값으로 두고,
+  // 화면을 처음 켰을 때 스크롤 위치가 현재 시각(예: 09:00)부터 보이도록 자동 스크롤
+  const [startHour, setStartHour] = useState(6);
   const [endHour, setEndHour] = useState(() =>
-    Math.max(new Date().getHours(), loadLocal("myplan-end-hour", 23))
+    Math.max(6, loadLocal("myplan-end-hour", 23))
   );
+  const timelineScrollRef = useRef(null);
   const [activeSlotHour, setActiveSlotHour] = useState(null);
   const [editingEventId, setEditingEventId] = useState(null);
   const [slotTitle, setSlotTitle] = useState("");
@@ -645,50 +657,12 @@ export default function App() {
 
       setEvents((prev) => {
         const localOnly = prev.filter((ev) => !ev.googleEventId);
-        const merged = [...localOnly, ...gDaily];
-        // 평일 반복이 켜져 있고 오늘이 평일(월~금)이면 루틴 템플릿 중 비어있는 시간대 유지
-        const jsDay = new Date().getDay();
-        if (weekdayRepeat && jsDay >= 1 && jsDay <= 5 && weekdayTemplates.length > 0) {
-          weekdayTemplates.forEach((tpl) => {
-            if (!merged.some((ev) => ev.start === tpl.start)) {
-              merged.push({
-                id: `routine-d-${tpl.start}`,
-                routineId: tpl.id,
-                isWeekdayRoutine: true,
-                title: tpl.title,
-                start: tpl.start,
-                end: tpl.end,
-                color: tpl.color || "sky",
-              });
-            }
-          });
-        }
-        return merged;
+        return [...localOnly, ...gDaily];
       });
 
       setWeeklyEvents((prev) => {
         const localOnly = prev.filter((ev) => !ev.googleEventId);
-        const merged = [...localOnly, ...gWeekly];
-        if (weekdayRepeat && weekdayTemplates.length > 0) {
-          for (let d = 0; d <= 4; d++) {
-            weekdayTemplates.forEach((tpl) => {
-              if (!merged.some((ev) => ev.day === d && ev.start === tpl.start)) {
-                merged.push({
-                  id: `routine-w-${d}-${tpl.start}`,
-                  routineId: tpl.id,
-                  isWeekdayRoutine: true,
-                  day: d,
-                  start: tpl.start,
-                  end: tpl.end,
-                  title: tpl.title,
-                  color: tpl.color || "sky",
-                  done: false,
-                });
-              }
-            });
-          }
-        }
-        return merged;
+        return [...localOnly, ...gWeekly];
       });
 
       // 3) 구글 Tasks 할 일 불러오기
@@ -706,6 +680,22 @@ export default function App() {
       );
     } catch (err) {
       if (err?.code === 401 || err?.message === "TOKEN_EXPIRED") {
+        // 토큰(1시간 유효) 만료 시 백그라운드 무음 갱신(interactive: false)을 먼저 시도하여
+        // 사용자가 매번 다시 로그인 버튼을 누르지 않아도 로그인 상태가 자동 유지되도록 처리
+        try {
+          const activeCid = getActiveClientId(googleClientId);
+          const refreshedToken = await loginWithGoogle(activeCid, {
+            interactive: false,
+            loginHint: googleUser?.email || "",
+          });
+          if (refreshedToken) {
+            setGoogleToken(refreshedToken);
+            setSyncError("");
+            return;
+          }
+        } catch {
+          // 백그라운드 자동 갱신이 불가능한 경우(크롬에서 구글 계정 자체가 로그아웃된 경우 등)에만 안내 표시
+        }
         setGoogleToken("");
         setGoogleUser(null);
         setSyncError(
@@ -838,63 +828,93 @@ export default function App() {
     }
   }
 
-  function toggleWeekdayRepeatMode(nextValue) {
-    const targetState =
-      typeof nextValue === "boolean" ? nextValue : !weekdayRepeat;
-
-    // 토/일 주말에는 평일 반복 ON을 눌러도 적용되지 않고 안내 토스트 표시
-    if (targetState && isTodayWeekend()) {
-      setWeekdayRepeat(false);
+  // [전주 루틴 불러오기] 저장된 평일 루틴 템플릿을 이번 주 월~금(및 오늘이 평일이면 오늘 일정)에 적용하고,
+  // 구글 캘린더에도 이번 주 월~금(UNTIL 금요일) 반복 일정으로 깔끔하게 등록
+  async function loadSavedRoutineForThisWeek() {
+    if (isTodayWeekend()) {
       showToast(t.weekendRepeatBlockedToast);
       return;
     }
 
-    setWeekdayRepeat(targetState);
+    let activeTemplates = weekdayTemplates;
 
-    if (targetState) {
-      let activeTemplates = weekdayTemplates;
-
-      // 아직 저장된 평일 루틴 템플릿이 없다면 현재 오늘의 일정(평일인 경우) 또는 주간 계획표 평일 일정에서 자동 추출
-      if (activeTemplates.length === 0) {
-        if (!isTodayWeekend() && events.length > 0) {
-          activeTemplates = events.map((ev) => ({
-            id: `tpl-${ev.start}-${Date.now()}`,
-            title: ev.title,
-            start: ev.start,
-            end: ev.end,
-            color: ev.color || "sky",
-          }));
-        } else {
-          const weekdaySource = weeklyEvents.filter(
-            (ev) => ev.day >= 0 && ev.day <= 4
-          );
-          const byStart = new Map();
-          weekdaySource.forEach((ev) => {
-            if (!byStart.has(ev.start)) {
-              byStart.set(ev.start, {
-                id: `tpl-${ev.start}-${Date.now()}`,
-                title: ev.title,
-                start: ev.start,
-                end: ev.end,
-                color: ev.color || "sky",
-              });
-            }
-          });
-          activeTemplates = Array.from(byStart.values());
-        }
-        if (activeTemplates.length > 0) {
-          setWeekdayTemplates(activeTemplates);
-        }
+    // 저장된 루틴 템플릿이 아직 없다면 현재 주간 계획표(월~금)나 오늘의 평일 루틴 일정에서 추출 시도
+    if (activeTemplates.length === 0) {
+      const routineEvents = events.filter((ev) => ev.isWeekdayRoutine);
+      if (routineEvents.length > 0) {
+        activeTemplates = routineEvents.map((ev) => ({
+          id: `tpl-${ev.start}-${Date.now()}`,
+          title: ev.title,
+          start: ev.start,
+          end: ev.end,
+          color: ev.color || "sky",
+        }));
+      } else {
+        const weekdaySource = weeklyEvents.filter(
+          (ev) => ev.day >= 0 && ev.day <= 4 && ev.isWeekdayRoutine
+        );
+        const byStart = new Map();
+        weekdaySource.forEach((ev) => {
+          if (!byStart.has(ev.start)) {
+            byStart.set(ev.start, {
+              id: `tpl-${ev.start}-${Date.now()}`,
+              title: ev.title,
+              start: ev.start,
+              end: ev.end,
+              color: ev.color || "sky",
+            });
+          }
+        });
+        activeTemplates = Array.from(byStart.values());
       }
-
       if (activeTemplates.length > 0) {
-        applyTemplatesToWeekAndToday(activeTemplates);
+        setWeekdayTemplates(activeTemplates);
       }
-      showToast(t.routineSavedToast);
+    }
+
+    if (activeTemplates.length === 0) {
+      showToast(t.emptyRoutineToast);
+      return;
+    }
+
+    setWeekdayRepeat(true);
+    applyTemplatesToWeekAndToday(activeTemplates);
+    showToast(t.routineSavedToast);
+
+    if (googleToken) {
+      try {
+        setIsSyncing(true);
+        for (const tpl of activeTemplates) {
+          const alreadyOnToday = events.some(
+            (ev) =>
+              ev.start === tpl.start &&
+              ev.title === tpl.title &&
+              Boolean(ev.googleEventId)
+          );
+          if (!alreadyOnToday) {
+            await createGoogleCalendarEvent(googleToken, {
+              title: tpl.title,
+              start: tpl.start,
+              end: tpl.end,
+              color: tpl.color || "sky",
+              isWeekdayRoutine: true,
+            });
+          }
+        }
+        await syncAllWithGoogle(googleToken, true);
+      } catch (err) {
+        console.warn("전주 루틴 구글 캘린더 등록 실패:", err);
+      } finally {
+        setIsSyncing(false);
+      }
     }
   }
 
-  // 현재 오늘의 타임라인(events) 전체를 평일(월~금) 루틴으로 즉시 저장 및 적용 (주말에는 차단)
+  function toggleWeekdayRepeatMode(nextValue) {
+    loadSavedRoutineForThisWeek();
+  }
+
+  // 현재 오늘의 타임라인(events) 전체를 평일(월~금) 루틴으로 즉시 저장 및 이번 주에만 적용 (주말에는 차단)
   async function saveCurrentDailyAsWeekdayRoutine() {
     if (isTodayWeekend()) {
       showToast(t.weekendRepeatBlockedToast);
@@ -936,15 +956,6 @@ export default function App() {
     }
   }
 
-  // 앱 실행 시 평일 반복이 켜져 있고 오늘이 월~금(1~5)이면 루틴이 빠져 있을 때 자동으로 채워줌
-  useEffect(() => {
-    if (!weekdayRepeat || weekdayTemplates.length === 0) return;
-    const jsDay = new Date().getDay(); // 1(월) ~ 5(금)
-    if (jsDay >= 1 && jsDay <= 5) {
-      applyTemplatesToWeekAndToday(weekdayTemplates);
-    }
-  }, [weekdayRepeat]);
-
   // [1] 타임라인 슬롯 클릭 시 일정 입력창 열기
   function openSlotForm(hour, existingEvent = null) {
     const weekend = isTodayWeekend();
@@ -956,7 +967,7 @@ export default function App() {
       setSlotEndHour(existingEvent.end);
       setSlotColor(existingEvent.color || "sage");
       setSlotRepeatWeekday(
-        weekend ? false : Boolean(existingEvent.isWeekdayRoutine || weekdayRepeat)
+        weekend ? false : Boolean(existingEvent.isWeekdayRoutine)
       );
     } else {
       setEditingEventId(null);
@@ -965,7 +976,7 @@ export default function App() {
       setSlotStartHour(hour);
       setSlotEndHour(Math.min(24, hour + 1));
       setSlotColor("sage");
-      setSlotRepeatWeekday(weekend ? false : Boolean(weekdayRepeat));
+      setSlotRepeatWeekday(false);
     }
   }
 
@@ -1207,6 +1218,19 @@ export default function App() {
     return Array.from({ length: count }, (_, i) => startHour + i);
   }, [startHour, endHour]);
 
+  // 팝업을 열거나 Daily Schedule 탭으로 전환할 때 현재 시각(예: 09:00) 위치로 자동 스크롤
+  useEffect(() => {
+    if (tab !== "schedule") return;
+    const el = timelineScrollRef.current;
+    if (!el) return;
+    const currentHour = new Date().getHours();
+    if (currentHour > startHour && currentHour <= endHour) {
+      el.scrollTop = (currentHour - startHour) * 44;
+    } else {
+      el.scrollTop = 0;
+    }
+  }, [tab]);
+
   const todayFocusSessions = useMemo(
     () =>
       focusSessions
@@ -1442,7 +1466,7 @@ export default function App() {
               <CalendarRange size={16} /> {t.openAnalytics} <ExternalLink size={14} />
             </button>
 
-            {/* 평일 루틴 자동 반복 (월~금) 토글 */}
+            {/* 전주(평일) 루틴 불러오기 & 현재 일정을 루틴으로 저장 */}
             <div className="setting-routine-box">
               <div className="setting-routine-top">
                 <div className="setting-routine-label">
@@ -1454,12 +1478,11 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  role="switch"
-                  aria-checked={weekdayRepeat}
-                  className={`ios-switch ${weekdayRepeat ? "on" : ""}`}
-                  onClick={() => toggleWeekdayRepeatMode(!weekdayRepeat)}
+                  className="weekday-pill-toggle active"
+                  onClick={loadSavedRoutineForThisWeek}
                 >
-                  <span className="ios-switch-thumb" />
+                  <RotateCcw size={11} />
+                  <span>{t.loadPrevRoutineBtn}</span>
                 </button>
               </div>
               {events.length > 0 && (
@@ -1735,12 +1758,12 @@ export default function App() {
                   <h2 className="timeline-simple-title">{t.todayTimeline}</h2>
                   <button
                     type="button"
-                    className={`weekday-pill-toggle ${weekdayRepeat ? "active" : ""}`}
-                    onClick={() => toggleWeekdayRepeatMode(!weekdayRepeat)}
-                    title={t.weekdayRepeatDesc}
+                    className="weekday-pill-toggle active"
+                    onClick={loadSavedRoutineForThisWeek}
+                    title={t.loadPrevRoutineTitle}
                   >
-                    <Repeat size={11} />
-                    <span>{t.weekdayRepeatShort} {weekdayRepeat ? "ON" : "OFF"}</span>
+                    <RotateCcw size={11} />
+                    <span>{t.loadPrevRoutineBtn}</span>
                   </button>
                 </div>
                 <div className="time-range-picker">
@@ -1750,6 +1773,9 @@ export default function App() {
                       const val = Number(e.target.value);
                       setStartHour(val);
                       if (val >= endHour) setEndHour(Math.min(23, val + 1));
+                      if (timelineScrollRef.current) {
+                        timelineScrollRef.current.scrollTop = 0;
+                      }
                     }}
                     aria-label="Start hour"
                   >
@@ -1881,7 +1907,7 @@ export default function App() {
                 </form>
               )}
 
-              <div className="timeline-simple-scroll">
+              <div className="timeline-simple-scroll" ref={timelineScrollRef}>
                 <div className="timeline-simple-list">
                   {timelineHours.map((h) => {
                     // 시작 시각이 정확히 h이거나, 타임라인 첫 줄(startHour)인데 이전 시간부터 이어지는 일정인 경우 표시
@@ -2290,7 +2316,7 @@ function AnalyticsPlatform({
         title: "",
         color: "sage",
         done: false,
-        repeatWeekdays: Boolean(weekdayRepeat && dayIdx >= 0 && dayIdx <= 4),
+        repeatWeekdays: false,
       });
     }
   }
@@ -2323,7 +2349,7 @@ function AnalyticsPlatform({
     };
     setEditingSlot(null);
 
-    // "평일(월~금) 매일 반복 루틴으로 등록" 체크 시 월(0)~금(4) 전체에 즉시 복제 + 루틴 템플릿 등록
+    // "이번 주 평일(월~금) 반복 루틴으로 등록" 체크 시 월(0)~금(4) 전체에 즉시 복제 + 루틴 템플릿 등록
     if (repeatAllWeekdays) {
       const tplItem = {
         id: `tpl-${start}-${Date.now()}`,
@@ -2337,9 +2363,6 @@ function AnalyticsPlatform({
           ...prev.filter((tItem) => tItem.start !== start),
           tplItem,
         ]);
-      }
-      if (onToggleWeekdayRepeat && !weekdayRepeat) {
-        onToggleWeekdayRepeat(true);
       }
       setWeeklyEvents((prev) => {
         const filtered = prev.filter(
@@ -2664,16 +2687,14 @@ function AnalyticsPlatform({
                 <div className="weekly-header-right">
                   <button
                     type="button"
-                    className={`weekday-pill-toggle large ${weekdayRepeat ? "active" : ""}`}
+                    className="weekday-pill-toggle large active"
                     onClick={() =>
-                      onToggleWeekdayRepeat && onToggleWeekdayRepeat(!weekdayRepeat)
+                      onToggleWeekdayRepeat && onToggleWeekdayRepeat(true)
                     }
-                    title={t.weekdayRepeatDesc}
+                    title={t.loadPrevRoutineTitle}
                   >
-                    <Repeat size={13} />
-                    <span>
-                      {t.weekdayRepeatTitle} : {weekdayRepeat ? "ON" : "OFF"}
-                    </span>
+                    <RotateCcw size={13} />
+                    <span>{t.loadPrevRoutineBtn}</span>
                   </button>
                   <div className="week-range-controls">
                     <button
